@@ -1,0 +1,293 @@
+# Architecture
+
+`locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
+
+This document describes the planned architecture. The repository is currently at Stage 1, so implementation files have not been created yet.
+
+## System Overview
+
+Planned stack:
+
+- Frontend: React + Vite + TypeScript.
+- Backend: NestJS + TypeScript.
+- Database: PostgreSQL.
+- ORM: Prisma.
+- Deployment: Docker Compose.
+- Reverse proxy: Nginx.
+
+The backend API owns business logic:
+
+- User profile persistence.
+- Balance reads.
+- Locker assignment.
+- Storage session lifecycle.
+- Admin authentication.
+- Admin locker/session/user operations.
+- Public locker grid data.
+
+Frontend apps should be thin clients that call backend APIs.
+
+## Apps and Responsibilities
+
+### Telegram MiniApp: `apps/tma`
+
+Responsibilities:
+
+- Load or upsert Telegram user profile.
+- Show user profile data.
+- Show user balance.
+- Show active storage sessions.
+- Show storage history.
+- Let the user start a storage session by selecting `S`, `M`, `L`, or `XL`.
+- Show assigned locker code.
+- Let the user finish an active storage session.
+
+### Admin Web Panel: `apps/admin`
+
+Responsibilities:
+
+- Admin login with simple MVP credentials.
+- Dashboard with basic stats.
+- View all lockers.
+- View locker statuses.
+- Change locker status between `AVAILABLE` and `MAINTENANCE`.
+- View active sessions.
+- View users.
+
+### Public Display Page: `apps/display`
+
+Responsibilities:
+
+- Show all lockers in a visual grid.
+- Show locker status as `AVAILABLE`, `OCCUPIED`, or `MAINTENANCE`.
+- Poll the backend every few seconds.
+- Require no authentication.
+
+### Backend API: `backend/api`
+
+Responsibilities:
+
+- Provide API endpoints for all frontend apps.
+- Enforce business rules.
+- Persist data through Prisma and PostgreSQL.
+- Run database migrations and seed test lockers.
+
+### Infrastructure: `infra`
+
+Responsibilities:
+
+- Define Docker Compose services.
+- Define Nginx routing.
+- Support VPS deployment without manual Node.js installation.
+
+## Planned Backend Modules
+
+### Prisma Module
+
+- Provides a shared Prisma client.
+- Owns database access setup.
+- Supports migrations and seed data.
+
+### Users Module
+
+- Upserts Telegram MiniApp users.
+- Returns current user profile and balance.
+- Returns user active sessions and history.
+
+### Lockers Module
+
+- Lists lockers.
+- Provides admin locker management.
+- Enforces locker status rules.
+
+### Sessions Module
+
+- Starts storage sessions.
+- Finishes storage sessions.
+- Implements transactional locker assignment.
+- Implements transactional locker release.
+
+### Auth Module
+
+- Handles admin login.
+- Issues JWTs.
+- Protects admin endpoints.
+
+### Admin Module
+
+- Provides dashboard stats.
+- Lists users.
+- Lists sessions.
+- Exposes admin locker operations.
+
+### Public Module
+
+- Exposes public locker grid data for the display page.
+
+## Data Model
+
+### User
+
+Fields:
+
+- `id`
+- `telegramId`
+- `username`
+- `firstName`
+- `lastName`
+- `balance`
+- `createdAt`
+- `updatedAt`
+
+Rules:
+
+- `telegramId` must be unique.
+- `balance` is only a numeric field.
+- No payment transaction model exists in MVP.
+
+### Locker
+
+Fields:
+
+- `id`
+- `code`
+- `size`: `S | M | L | XL`
+- `status`: `AVAILABLE | OCCUPIED | MAINTENANCE`
+- `row`
+- `column`
+- `createdAt`
+- `updatedAt`
+
+Rules:
+
+- `code` must be unique.
+- `row` and `column` support public display layout.
+- Only `AVAILABLE` lockers can be assigned to new sessions.
+
+### StorageSession
+
+Fields:
+
+- `id`
+- `userId`
+- `lockerId`
+- `requestedSize`: `S | M | L | XL`
+- `status`: `ACTIVE | COMPLETED`
+- `startedAt`
+- `endedAt`
+- `createdAt`
+- `updatedAt`
+
+Rules:
+
+- A session starts as `ACTIVE`.
+- A completed session has `endedAt`.
+- Finishing a session releases the locker.
+
+### Optional AdminUser
+
+For MVP, an `AdminUser` entity is not planned initially.
+
+Admin credentials should come from environment variables:
+
+```txt
+ADMIN_LOGIN=admin
+ADMIN_PASSWORD=change-me
+JWT_SECRET=change-me
+```
+
+## Locker Selection Logic
+
+When a user starts storage, they select a requested luggage size.
+
+Allowed locker sizes:
+
+```txt
+S  -> S, M, L, XL
+M  -> M, L, XL
+L  -> L, XL
+XL -> XL
+```
+
+The backend must assign the smallest available suitable locker.
+
+Example:
+
+If the user requests `M` and no `M` locker is available, assign an available `L` locker before considering `XL`.
+
+The start-session operation must run in a transaction:
+
+1. Find the smallest suitable `AVAILABLE` locker.
+2. Create an `ACTIVE` storage session.
+3. Mark the locker as `OCCUPIED`.
+
+The finish-session operation must run in a transaction:
+
+1. Mark the storage session as `COMPLETED`.
+2. Set `endedAt`.
+3. Mark the locker as `AVAILABLE`.
+
+## User Flow
+
+### Start Storage
+
+1. User opens Telegram MiniApp.
+2. MiniApp sends Telegram user data to backend.
+3. Backend creates or updates the user.
+4. User selects luggage size: `S`, `M`, `L`, or `XL`.
+5. Frontend sends selected size to backend.
+6. Backend finds the smallest suitable available locker.
+7. Backend creates an active storage session.
+8. Backend marks the locker as `OCCUPIED`.
+9. User sees the assigned locker code.
+
+### Finish Storage
+
+1. User opens active storage session.
+2. User clicks finish or take luggage.
+3. Backend marks the session as `COMPLETED`.
+4. Backend sets `endedAt`.
+5. Backend marks the locker as `AVAILABLE`.
+6. User no longer sees the session as active.
+
+## Admin Flow
+
+1. Admin opens `/admin`.
+2. Admin logs in using `ADMIN_LOGIN` and `ADMIN_PASSWORD`.
+3. Backend issues JWT.
+4. Admin views dashboard stats.
+5. Admin views users, active sessions, and lockers.
+6. Admin may change an unused locker between `AVAILABLE` and `MAINTENANCE`.
+
+For MVP, admin authentication is intentionally simple and environment-variable based.
+
+## Public Display Flow
+
+1. Public display opens `/display`.
+2. Display app calls public locker endpoint.
+3. Display app renders lockers in a grid using `row` and `column`.
+4. Display app shows each locker status.
+5. Display app polls every few seconds.
+
+No authentication is required for the public display page.
+
+## MVP Limitations
+
+The MVP intentionally excludes:
+
+- Real payments.
+- Payment providers.
+- Invoices.
+- Refunds.
+- Transaction history.
+- Physical locker integration.
+- WebSockets.
+- Complex analytics.
+- Multiple locker locations.
+- QR codes.
+- 3D visualization.
+- Real baggage dimension input.
+- Complex admin roles.
+- Production-grade Telegram auth hardening unless explicitly requested.
+
+These limitations keep the first version small, deployable, and testable.
