@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture. The repository is currently at Stage 1, so implementation files have not been created yet.
+This document describes the planned architecture and current backend foundation. The repository is currently at Stage 2: the NestJS API scaffold, Prisma schema, initial migration, and seed script exist under `backend/api`.
 
 ## System Overview
 
@@ -72,6 +72,16 @@ Responsibilities:
 - Persist data through Prisma and PostgreSQL.
 - Run database migrations and seed test lockers.
 
+Current Stage 2 contents:
+
+- Minimal NestJS application scaffold.
+- Global `/api` prefix.
+- `GET /api/health` health endpoint.
+- Global `ConfigModule` reading `backend/api/.env` or root `.env`.
+- Global `PrismaModule` and `PrismaService`.
+- Shared TypeScript enums for locker size, locker status, and session status.
+- Prisma schema, initial migration, and deterministic seed script.
+
 ### Infrastructure: `infra`
 
 Responsibilities:
@@ -87,6 +97,7 @@ Responsibilities:
 - Provides a shared Prisma client.
 - Owns database access setup.
 - Supports migrations and seed data.
+- Implemented in Stage 2 as `src/prisma/prisma.module.ts` and `src/prisma/prisma.service.ts`.
 
 ### Users Module
 
@@ -130,12 +141,12 @@ Responsibilities:
 
 Fields:
 
-- `id`
-- `telegramId`
+- `id`: UUID string primary key.
+- `telegramId`: unique string.
 - `username`
 - `firstName`
 - `lastName`
-- `balance`
+- `balance`: decimal, default `0`, precision `12,2`.
 - `createdAt`
 - `updatedAt`
 
@@ -149,8 +160,8 @@ Rules:
 
 Fields:
 
-- `id`
-- `code`
+- `id`: UUID string primary key.
+- `code`: unique string.
 - `size`: `S | M | L | XL`
 - `status`: `AVAILABLE | OCCUPIED | MAINTENANCE`
 - `row`
@@ -162,13 +173,15 @@ Rules:
 
 - `code` must be unique.
 - `row` and `column` support public display layout.
+- `row` and `column` are unique together.
+- `status` and `size` are indexed together for locker selection.
 - Only `AVAILABLE` lockers can be assigned to new sessions.
 
 ### StorageSession
 
 Fields:
 
-- `id`
+- `id`: UUID string primary key.
 - `userId`
 - `lockerId`
 - `requestedSize`: `S | M | L | XL`
@@ -183,6 +196,36 @@ Rules:
 - A session starts as `ACTIVE`.
 - A completed session has `endedAt`.
 - Finishing a session releases the locker.
+- `userId/status`, `lockerId/status`, and `status/startedAt` are indexed for MVP queries.
+
+## Current Migration and Seed
+
+The initial migration is:
+
+```txt
+backend/api/prisma/migrations/20260501000000_init/migration.sql
+```
+
+It creates:
+
+- `LockerSize`, `LockerStatus`, and `SessionStatus` PostgreSQL enums.
+- `users` table.
+- `lockers` table.
+- `storage_sessions` table.
+- Required unique constraints, indexes, and foreign keys.
+
+The seed script is:
+
+```txt
+backend/api/prisma/seed.ts
+```
+
+It upserts deterministic test lockers:
+
+```txt
+A01 S   A02 S   A03 M   A04 M
+B01 L   B02 L   B03 XL  B04 XL
+```
 
 ### Optional AdminUser
 

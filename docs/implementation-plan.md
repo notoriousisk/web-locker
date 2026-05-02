@@ -393,6 +393,20 @@ Acceptance criteria:
 - Seed command creates test lockers.
 - Documentation is updated with backend setup, schema, migrations, and seed commands.
 
+Current status:
+
+- Completed.
+
+Stage 2 result:
+
+- NestJS API scaffold added in `backend/api`.
+- Prisma added with `backend/api/prisma.config.ts`.
+- Initial schema added at `backend/api/prisma/schema.prisma`.
+- Initial migration added at `backend/api/prisma/migrations/20260501000000_init/migration.sql`.
+- Seed script added at `backend/api/prisma/seed.ts`.
+- Shared backend enum files added under `backend/api/src/common/enums`.
+- Verification passed for Prisma validation, Prisma client generation, lint, and build.
+
 ### Stage 3: Core Backend Business Logic
 
 Goals:

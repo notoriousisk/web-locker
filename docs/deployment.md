@@ -2,7 +2,7 @@
 
 This document describes the planned VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 1: skeleton and documentation only. Docker Compose, Nginx config, backend, frontend apps, migrations, and seed scripts have not been implemented yet.
+The repository is currently at Stage 2: backend foundation. The NestJS API scaffold, Prisma schema, initial migration, and seed script exist under `backend/api`. Docker Compose, Nginx config, and frontend apps have not been implemented yet.
 
 ## VPS Assumptions
 
@@ -112,6 +112,36 @@ Rules:
 
 Database schema changes must use Prisma migrations.
 
+Current migration:
+
+```txt
+backend/api/prisma/migrations/20260501000000_init/migration.sql
+```
+
+Current seed script:
+
+```txt
+backend/api/prisma/seed.ts
+```
+
+The backend Prisma config is:
+
+```txt
+backend/api/prisma.config.ts
+```
+
+Local backend commands:
+
+```sh
+cd backend/api
+npm install
+npm run prisma:generate
+
+# requires DATABASE_URL and a running PostgreSQL database
+npm run prisma:migrate:dev
+npm run db:seed
+```
+
 Planned production migration command:
 
 ```sh
@@ -131,6 +161,13 @@ docker compose -f infra/docker-compose.yml exec api npm run db:seed
 ```
 
 Seed data should include test lockers with different sizes and grid positions.
+
+Current seed data creates eight test lockers:
+
+```txt
+A01 S   A02 S   A03 M   A04 M
+B01 L   B02 L   B03 XL  B04 XL
+```
 
 Migration rules:
 

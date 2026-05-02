@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 1: skeleton and documentation only.
+The repository is currently at Stage 2: backend foundation.
 
-Do not assume backend, frontend, database schema, migrations, Docker Compose, or Nginx files already exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, and seed script exist under `backend/api`. Do not assume frontend apps, Docker Compose, or Nginx implementation files exist until you inspect the repository.
 
 ## Mandatory Files to Read Before Editing
 
@@ -194,6 +194,7 @@ Rules:
 - Seed test lockers for MVP development and demo environments.
 - Update `docs/architecture.md`, `docs/deployment.md`, and `README.md` when schema, migration, or seed behavior changes.
 - Do not add payment transaction tables in MVP.
+- Keep `backend/api/prisma.config.ts`, `backend/api/prisma/schema.prisma`, migrations, seed scripts, and docs aligned.
 
 ## Environment Variable Rules
 

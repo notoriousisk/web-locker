@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 1: repository skeleton and documentation only. Backend, frontend, database schema, migrations, Docker Compose services, and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 2: backend foundation. The NestJS API scaffold, Prisma schema, initial migration, and test locker seed script exist under `backend/api`. Frontend apps, Docker Compose services, and Nginx configuration are planned but not implemented yet.
 
 ## MVP Scope
 
@@ -43,6 +43,13 @@ The MVP will not include:
 │   └── display/
 ├── backend/
 │   └── api/
+│       ├── prisma/
+│       │   ├── migrations/
+│       │   ├── schema.prisma
+│       │   └── seed.ts
+│       ├── src/
+│       ├── package.json
+│       └── prisma.config.ts
 ├── infra/
 │   └── nginx/
 ├── docs/
@@ -59,7 +66,7 @@ Planned responsibilities:
 - `apps/tma`: Telegram MiniApp frontend.
 - `apps/admin`: Admin web panel frontend.
 - `apps/display`: Public locker display frontend.
-- `backend/api`: NestJS backend API.
+- `backend/api`: NestJS backend API with Prisma schema, initial migration, and seed data.
 - `infra`: Docker Compose and Nginx deployment files.
 - `docs`: architecture, deployment, and implementation planning documents.
 
@@ -71,17 +78,33 @@ Future agents must update `docs/implementation-plan.md` whenever implementation 
 
 ## Planned Local Development Flow
 
-Local development is planned to use project-level package commands after the backend and frontend apps are scaffolded.
+Local backend development currently happens from `backend/api`.
 
-Expected future flow:
+Backend setup:
 
 ```sh
-# install dependencies after package files exist
+# from repository root
+cd backend/api
 npm install
 
-# start backend locally after backend is scaffolded
-npm run dev:api
+# generate Prisma client
+npm run prisma:generate
 
+# run the API in watch mode
+npm run start:dev
+```
+
+The backend reads environment variables from `backend/api/.env` or the repository-root `.env`.
+
+The backend exposes a basic health endpoint at:
+
+```txt
+GET /api/health
+```
+
+Planned future frontend flow:
+
+```sh
 # start Telegram MiniApp frontend after app is scaffolded
 npm run dev:tma
 
@@ -93,6 +116,30 @@ npm run dev:display
 ```
 
 The exact commands must be updated when package scripts are added.
+
+## Backend Database Commands
+
+These commands require `DATABASE_URL` to point at a running PostgreSQL database:
+
+```sh
+cd backend/api
+
+# apply migrations in development
+npm run prisma:migrate:dev
+
+# apply existing migrations in deployment-like environments
+npm run prisma:migrate:deploy
+
+# seed deterministic test lockers
+npm run db:seed
+```
+
+The initial seed creates these lockers:
+
+```txt
+A01 S   A02 S   A03 M   A04 M
+B01 L   B02 L   B03 XL  B04 XL
+```
 
 ## Planned Docker Compose Deployment Flow
 
@@ -167,6 +214,13 @@ Never commit real secrets. `.env.example` must contain placeholders only.
 These commands are planned and must be verified or updated as implementation progresses:
 
 ```sh
+# backend only
+cd backend/api
+npm install
+npm run prisma:generate
+npm run build
+npm run lint
+
 # start all services through Docker Compose
 docker compose -f infra/docker-compose.yml up -d --build
 

@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LockerSize {
+  S
+  M
+  L
+  XL
+}
+
+enum LockerStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model User {
+  id              String           @id @default(uuid())
+  telegramId      String           @unique
+  username        String?
+  firstName       String?
+  lastName        String?
+  balance         Decimal          @default(0) @db.Decimal(12, 2)
+  storageSessions StorageSession[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("users")
+}
+
+model Locker {
+  id              String           @id @default(uuid())
+  code            String           @unique
+  size            LockerSize
+  status          LockerStatus     @default(AVAILABLE)
+  row             Int
+  column          Int
+  storageSessions StorageSession[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status, size])
+  @@unique([row, column])
+  @@map("lockers")
+}
+
+model StorageSession {
+  id            String        @id @default(uuid())
+  userId        String
+  lockerId      String
+  requestedSize LockerSize
+  status        SessionStatus @default(ACTIVE)
+  startedAt     DateTime      @default(now())
+  endedAt       DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  locker Locker @relation(fields: [lockerId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+  @@index([lockerId, status])
+  @@index([status, startedAt])
+  @@map("storage_sessions")
+}
