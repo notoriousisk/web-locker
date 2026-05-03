@@ -250,6 +250,27 @@ After editing:
 - Summarize changed files.
 - Explain any commands that could not be run.
 
+## Library Documentation and Context7
+
+When encountering errors, unclear behavior, version-specific APIs, dependency issues, framework conventions, or uncertainty about any library used in this project, agents may use the Context7 MCP tools to inspect current official library documentation before changing code.
+
+Use Context7 especially for:
+
+- NestJS APIs, modules, decorators, guards, providers, and configuration.
+- Prisma schema, migrations, client usage, seeding, and transaction behavior.
+- React, Vite, and TypeScript patterns when frontend stages begin.
+- Nginx, Docker Compose, or deployment-related library/tool syntax when infrastructure stages begin.
+- Any dependency error where installed package behavior may differ from remembered behavior.
+
+Context7 usage rules:
+
+- Prefer current library documentation over memory when debugging errors.
+- Resolve the library ID first, then query the relevant docs.
+- Keep queries focused on the concrete error, API, or version-specific behavior.
+- Do not use documentation lookup as permission to expand MVP scope.
+- If docs reveal that existing project documentation is stale, update the relevant project docs in the same change.
+- Mention in the final report when Context7 materially informed a fix or design decision.
+
 ## Reporting Format After Each Change
 
 When finishing a task, report:
