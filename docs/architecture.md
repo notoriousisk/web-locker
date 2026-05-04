@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current backend foundation. The repository is currently at Stage 2: the NestJS API scaffold, Prisma schema, initial migration, and seed script exist under `backend/api`.
+This document describes the planned architecture and current backend implementation. The repository is currently at Stage 3: the NestJS API scaffold, Prisma schema, initial migration, seed script, core user/session/locker modules, and public read-only module exist under `backend/api`.
 
 ## System Overview
 
@@ -72,7 +72,7 @@ Responsibilities:
 - Persist data through Prisma and PostgreSQL.
 - Run database migrations and seed test lockers.
 
-Current Stage 2 contents:
+Current Stage 3 contents:
 
 - Minimal NestJS application scaffold.
 - Global `/api` prefix.
@@ -81,6 +81,10 @@ Current Stage 2 contents:
 - Global `PrismaModule` and `PrismaService`.
 - Shared TypeScript enums for locker size, locker status, and session status.
 - Prisma schema, initial migration, and deterministic seed script.
+- Users module for Telegram user placeholder upsert and profile reads.
+- Lockers module for DB-backed locker listing.
+- Sessions module for DB-backed active/history reads, start-session flow, and finish-session flow.
+- Public module for unauthenticated locker grid data and basic stats.
 
 ### Infrastructure: `infra`
 
@@ -104,12 +108,14 @@ Responsibilities:
 - Upserts Telegram MiniApp users.
 - Returns current user profile and balance.
 - Returns user active sessions and history.
+- Implemented in Stage 3 for user upsert and profile reads. Session listing is implemented in the Sessions module.
 
 ### Lockers Module
 
 - Lists lockers.
 - Provides admin locker management.
 - Enforces locker status rules.
+- Implemented in Stage 3 for DB-backed locker listing only. Admin status management is still planned for Stage 4.
 
 ### Sessions Module
 
@@ -117,6 +123,7 @@ Responsibilities:
 - Finishes storage sessions.
 - Implements transactional locker assignment.
 - Implements transactional locker release.
+- Implemented in Stage 3 using `PrismaService` and real PostgreSQL-backed transactions.
 
 ### Auth Module
 
@@ -134,6 +141,8 @@ Responsibilities:
 ### Public Module
 
 - Exposes public locker grid data for the display page.
+- Exposes basic public stats.
+- Implemented in Stage 3 as read-only endpoints.
 
 ## Data Model
 
@@ -264,11 +273,40 @@ The start-session operation must run in a transaction:
 2. Create an `ACTIVE` storage session.
 3. Mark the locker as `OCCUPIED`.
 
+Current implementation detail:
+
+- The sessions service checks suitable sizes in the required order.
+- For each size, it searches available lockers ordered by `row`, `column`, then `code`.
+- It uses a conditional `updateMany` on the selected locker with `status = AVAILABLE` before creating the session.
+- If another request took the same locker first, the service retries the same size before moving to the next suitable size.
+
 The finish-session operation must run in a transaction:
 
 1. Mark the storage session as `COMPLETED`.
 2. Set `endedAt`.
 3. Mark the locker as `AVAILABLE`.
+
+Current implementation verifies the active session belongs to the provided `telegramId` before releasing the locker.
+
+## Current Backend Endpoints
+
+```txt
+GET  /api/health
+
+POST /api/tma/users/upsert
+GET  /api/tma/me?telegramId=<telegram-id>
+GET  /api/tma/me/sessions/active?telegramId=<telegram-id>
+GET  /api/tma/me/sessions/history?telegramId=<telegram-id>
+POST /api/tma/sessions
+POST /api/tma/sessions/:id/finish
+
+GET  /api/lockers
+
+GET  /api/public/lockers
+GET  /api/public/stats
+```
+
+All Stage 3 business endpoints use `PrismaService` and the real PostgreSQL database. No in-memory storage or mock repositories are used.
 
 ## User Flow
 

@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 2: backend foundation. The NestJS API scaffold, Prisma schema, initial migration, and test locker seed script exist under `backend/api`. Frontend apps, Docker Compose services, and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 3: core backend business logic. The NestJS API, Prisma schema, initial migration, seed script, user endpoints, locker endpoints, storage session flows, and public read-only endpoints exist under `backend/api`. Frontend apps, Docker Compose services, and Nginx configuration are planned but not implemented yet.
 
 ## MVP Scope
 
@@ -102,6 +102,24 @@ The backend exposes a basic health endpoint at:
 GET /api/health
 ```
 
+Current backend API endpoints:
+
+```txt
+POST /api/tma/users/upsert
+GET  /api/tma/me?telegramId=<telegram-id>
+GET  /api/tma/me/sessions/active?telegramId=<telegram-id>
+GET  /api/tma/me/sessions/history?telegramId=<telegram-id>
+POST /api/tma/sessions
+POST /api/tma/sessions/:id/finish
+
+GET  /api/lockers
+
+GET  /api/public/lockers
+GET  /api/public/stats
+```
+
+The Stage 3 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
+
 Planned future frontend flow:
 
 ```sh
@@ -139,6 +157,39 @@ The initial seed creates these lockers:
 ```txt
 A01 S   A02 S   A03 M   A04 M
 B01 L   B02 L   B03 XL  B04 XL
+```
+
+## Backend API Examples
+
+Create or update a Telegram user placeholder:
+
+```sh
+curl -X POST http://localhost:3000/api/tma/users/upsert \
+  -H 'Content-Type: application/json' \
+  -d '{"telegramId":"1001","username":"demo","firstName":"Demo","lastName":"User"}'
+```
+
+Start a storage session:
+
+```sh
+curl -X POST http://localhost:3000/api/tma/sessions \
+  -H 'Content-Type: application/json' \
+  -d '{"telegramId":"1001","requestedSize":"M"}'
+```
+
+Finish a storage session:
+
+```sh
+curl -X POST http://localhost:3000/api/tma/sessions/<session-id>/finish \
+  -H 'Content-Type: application/json' \
+  -d '{"telegramId":"1001"}'
+```
+
+Read public locker data:
+
+```sh
+curl http://localhost:3000/api/public/lockers
+curl http://localhost:3000/api/public/stats
 ```
 
 ## Planned Docker Compose Deployment Flow

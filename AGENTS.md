@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 2: backend foundation.
+The repository is currently at Stage 3: core backend business logic.
 
-The backend scaffold, Prisma schema, initial migration, and seed script exist under `backend/api`. Do not assume frontend apps, Docker Compose, or Nginx implementation files exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, and public read-only module exist under `backend/api`. Do not assume frontend apps, admin auth, Docker Compose, or Nginx implementation files exist until you inspect the repository.
 
 ## Mandatory Files to Read Before Editing
 
@@ -153,6 +153,8 @@ Session creation must be transactional:
 1. Find the smallest suitable `AVAILABLE` locker.
 2. Create an `ACTIVE` storage session.
 3. Mark the locker as `OCCUPIED`.
+
+The implementation must use the real PostgreSQL database through `PrismaService`. Do not replace these flows with in-memory storage, static arrays, or mock data.
 
 Finishing a session must be transactional:
 

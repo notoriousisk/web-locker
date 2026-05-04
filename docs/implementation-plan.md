@@ -428,6 +428,20 @@ Acceptance criteria:
 - Relevant tests or verification steps exist.
 - Documentation is updated.
 
+Current status:
+
+- Completed.
+
+Stage 3 result:
+
+- Users module implemented for Telegram user placeholder upsert and profile reads.
+- Lockers module implemented for DB-backed locker listing.
+- Sessions module implemented for active/history listing, transactional start-session, and transactional finish-session.
+- Public module implemented for unauthenticated locker list and basic locker/session stats.
+- Locker assignment checks suitable sizes in the required order and assigns the smallest available suitable locker.
+- Core flows use the real PostgreSQL database through `PrismaService`; no in-memory storage or mock data was added.
+- Verification passed for Prisma validation, Prisma client generation, lint, and build.
+
 ### Stage 4: Admin Backend
 
 Goals:

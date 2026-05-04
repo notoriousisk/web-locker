@@ -2,7 +2,7 @@
 
 This document describes the planned VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 2: backend foundation. The NestJS API scaffold, Prisma schema, initial migration, and seed script exist under `backend/api`. Docker Compose, Nginx config, and frontend apps have not been implemented yet.
+The repository is currently at Stage 3: core backend business logic. The NestJS API, Prisma schema, initial migration, seed script, user/session/locker modules, and public read-only endpoints exist under `backend/api`. Docker Compose, Nginx config, and frontend apps have not been implemented yet.
 
 ## VPS Assumptions
 
@@ -141,6 +141,8 @@ npm run prisma:generate
 npm run prisma:migrate:dev
 npm run db:seed
 ```
+
+Stage 3 local API verification requires a running PostgreSQL database because the core flows use the real database through Prisma. There is no mock or in-memory backend mode.
 
 Planned production migration command:
 
