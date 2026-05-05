@@ -460,6 +460,21 @@ Acceptance criteria:
 - Admin can change eligible lockers between `AVAILABLE` and `MAINTENANCE`.
 - Documentation is updated.
 
+Current status:
+
+- Completed.
+
+Stage 4 result:
+
+- Env-based admin login implemented with `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
+- JWT admin guard protects admin endpoints.
+- Admin dashboard endpoint returns DB-backed user, locker, and session counts.
+- Admin users, lockers, active sessions, history sessions, and all sessions endpoints read from PostgreSQL through `PrismaService`.
+- Admin locker status updates allow only `AVAILABLE` and `MAINTENANCE`.
+- Admin status changes on `OCCUPIED` lockers are rejected; occupied lockers are released through the finish-session flow.
+- No `AdminUser` table or extra entity was added.
+- Verification passed for Prisma validation, Prisma client generation, lint, and build.
+
 ### Stage 5: Telegram MiniApp Frontend
 
 Goals:

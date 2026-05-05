@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current backend implementation. The repository is currently at Stage 3: the NestJS API scaffold, Prisma schema, initial migration, seed script, core user/session/locker modules, and public read-only module exist under `backend/api`.
+This document describes the planned architecture and current backend implementation. The repository is currently at Stage 4: the NestJS API scaffold, Prisma schema, initial migration, seed script, core user/session/locker modules, public read-only module, and JWT-protected admin backend exist under `backend/api`.
 
 ## System Overview
 
@@ -85,6 +85,7 @@ Current Stage 3 contents:
 - Lockers module for DB-backed locker listing.
 - Sessions module for DB-backed active/history reads, start-session flow, and finish-session flow.
 - Public module for unauthenticated locker grid data and basic stats.
+- Admin backend with env-based login, JWT guard, dashboard stats, user/session reads, locker reads, and constrained locker maintenance status updates.
 
 ### Infrastructure: `infra`
 
@@ -130,6 +131,7 @@ Responsibilities:
 - Handles admin login.
 - Issues JWTs.
 - Protects admin endpoints.
+- Implemented in Stage 4 as env-based admin login using `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
 
 ### Admin Module
 
@@ -137,6 +139,9 @@ Responsibilities:
 - Lists users.
 - Lists sessions.
 - Exposes admin locker operations.
+- Implemented in Stage 4 using real PostgreSQL reads through `PrismaService`.
+- Admin locker status updates allow only `AVAILABLE` and `MAINTENANCE`.
+- Currently `OCCUPIED` lockers cannot be changed manually from admin endpoints.
 
 ### Public Module
 
@@ -304,9 +309,19 @@ GET  /api/lockers
 
 GET  /api/public/lockers
 GET  /api/public/stats
+
+POST /api/admin/auth/login
+GET  /api/admin/auth/me
+GET  /api/admin/dashboard
+GET  /api/admin/users
+GET  /api/admin/lockers
+PATCH /api/admin/lockers/:id/status
+GET  /api/admin/sessions
+GET  /api/admin/sessions/active
+GET  /api/admin/sessions/history
 ```
 
-All Stage 3 business endpoints use `PrismaService` and the real PostgreSQL database. No in-memory storage or mock repositories are used.
+All Stage 3 and Stage 4 business endpoints use `PrismaService` and the real PostgreSQL database. No in-memory storage or mock repositories are used.
 
 ## User Flow
 
@@ -335,7 +350,7 @@ All Stage 3 business endpoints use `PrismaService` and the real PostgreSQL datab
 
 1. Admin opens `/admin`.
 2. Admin logs in using `ADMIN_LOGIN` and `ADMIN_PASSWORD`.
-3. Backend issues JWT.
+3. Backend issues an 8-hour JWT signed with `JWT_SECRET`.
 4. Admin views dashboard stats.
 5. Admin views users, active sessions, and lockers.
 6. Admin may change an unused locker between `AVAILABLE` and `MAINTENANCE`.

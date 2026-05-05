@@ -2,7 +2,7 @@
 
 This document describes the planned VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 3: core backend business logic. The NestJS API, Prisma schema, initial migration, seed script, user/session/locker modules, and public read-only endpoints exist under `backend/api`. Docker Compose, Nginx config, and frontend apps have not been implemented yet.
+The repository is currently at Stage 4: admin backend. The NestJS API, Prisma schema, initial migration, seed script, user/session/locker modules, public read-only endpoints, and JWT-protected admin backend exist under `backend/api`. Docker Compose, Nginx config, and frontend apps have not been implemented yet.
 
 ## VPS Assumptions
 
@@ -107,6 +107,7 @@ Rules:
 - Real secrets must be stored in `.env`, not committed.
 - `.env.example` must contain placeholders only.
 - Any new variable must be documented in `.env.example`, `README.md`, and this file.
+- `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` are required for Stage 4 admin login and protected admin endpoints.
 
 ## Migration and Seed Strategy
 

@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 3: core backend business logic. The NestJS API, Prisma schema, initial migration, seed script, user endpoints, locker endpoints, storage session flows, and public read-only endpoints exist under `backend/api`. Frontend apps, Docker Compose services, and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 4: admin backend. The NestJS API, Prisma schema, initial migration, seed script, user endpoints, locker endpoints, storage session flows, public read-only endpoints, and JWT-protected admin backend endpoints exist under `backend/api`. Frontend apps, Docker Compose services, and Nginx configuration are planned but not implemented yet.
 
 ## MVP Scope
 
@@ -116,9 +116,19 @@ GET  /api/lockers
 
 GET  /api/public/lockers
 GET  /api/public/stats
+
+POST /api/admin/auth/login
+GET  /api/admin/auth/me
+GET  /api/admin/dashboard
+GET  /api/admin/users
+GET  /api/admin/lockers
+PATCH /api/admin/lockers/:id/status
+GET  /api/admin/sessions
+GET  /api/admin/sessions/active
+GET  /api/admin/sessions/history
 ```
 
-The Stage 3 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
+The Stage 3 and Stage 4 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
 
 Planned future frontend flow:
 
@@ -191,6 +201,30 @@ Read public locker data:
 curl http://localhost:3000/api/public/lockers
 curl http://localhost:3000/api/public/stats
 ```
+
+Admin login and protected admin calls:
+
+```sh
+curl -X POST http://localhost:3000/api/admin/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"login":"admin","password":"change-me"}'
+
+curl http://localhost:3000/api/admin/dashboard \
+  -H 'Authorization: Bearer <access-token>'
+
+curl http://localhost:3000/api/admin/users \
+  -H 'Authorization: Bearer <access-token>'
+
+curl http://localhost:3000/api/admin/sessions/active \
+  -H 'Authorization: Bearer <access-token>'
+
+curl -X PATCH http://localhost:3000/api/admin/lockers/<locker-id>/status \
+  -H 'Authorization: Bearer <access-token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"status":"MAINTENANCE"}'
+```
+
+Admin locker status changes only allow `AVAILABLE` and `MAINTENANCE`. `OCCUPIED` lockers cannot be changed manually; they are released by finishing active storage sessions.
 
 ## Planned Docker Compose Deployment Flow
 

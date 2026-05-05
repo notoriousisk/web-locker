@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LockersModule } from './lockers/lockers.module';
@@ -18,7 +19,8 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     LockersModule,
     SessionsModule,
-    PublicModule
+    PublicModule,
+    AdminModule
   ],
   controllers: [AppController],
   providers: [AppService]

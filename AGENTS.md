@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 3: core backend business logic.
+The repository is currently at Stage 4: admin backend.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, and public read-only module exist under `backend/api`. Do not assume frontend apps, admin auth, Docker Compose, or Nginx implementation files exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, and JWT-protected admin backend exist under `backend/api`. Do not assume frontend apps, Docker Compose, or Nginx implementation files exist until you inspect the repository.
 
 ## Mandatory Files to Read Before Editing
 
@@ -209,6 +209,19 @@ Rules:
 - Use `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` for MVP admin authentication.
 - Use `DATABASE_URL` for Prisma.
 - Document every new required variable in `README.md` and `docs/deployment.md`.
+
+## Admin Backend Rules
+
+Admin authentication is an MVP-only env-based login.
+
+Rules:
+
+- Do not create an `AdminUser` table unless the user explicitly approves that scope change.
+- Protect admin read/write endpoints with the JWT admin guard.
+- Read users, sessions, lockers, and dashboard stats from PostgreSQL through `PrismaService`.
+- Allow admin locker status changes only between `AVAILABLE` and `MAINTENANCE`.
+- Do not allow admin requests to manually set a locker to `OCCUPIED`.
+- Do not allow admin status changes on currently `OCCUPIED` lockers; occupied lockers are released by finishing active storage sessions.
 
 ## Deployment Rules
 
