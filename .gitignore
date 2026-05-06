@@ -9,6 +9,9 @@ node_modules/
 # Build output
 dist/
 build/
+*.tsbuildinfo
+apps/tma/vite.config.js
+apps/tma/vite.config.d.ts
 
 # Logs
 *.log

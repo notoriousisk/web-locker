@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current backend implementation. The repository is currently at Stage 4: the NestJS API scaffold, Prisma schema, initial migration, seed script, core user/session/locker modules, public read-only module, and JWT-protected admin backend exist under `backend/api`.
+This document describes the planned architecture and current implementation. The repository is currently at Stage 5: the NestJS backend exists under `backend/api`, and the user-facing Telegram MiniApp frontend exists under `apps/tma`.
 
 ## System Overview
 
@@ -42,6 +42,21 @@ Responsibilities:
 - Show assigned locker code.
 - Let the user finish an active storage session.
 
+Current Stage 5 contents:
+
+- React + Vite + TypeScript app.
+- Mobile-first user interface.
+- Profile and balance view.
+- Active sessions view.
+- History sessions view.
+- Start storage flow with `S`, `M`, `L`, and `XL` size selection.
+- Assigned locker confirmation after starting storage.
+- Finish storage action for active sessions.
+- Vite dev proxy from `/api` to `http://localhost:3000`.
+- API base URL read from `VITE_TMA_API_BASE_URL`, defaulting to `/api`.
+
+For MVP, the TMA uses a placeholder Telegram identity flow. It reads `window.Telegram.WebApp.initDataUnsafe.user.id` when available and falls back to an editable demo `telegramId` outside Telegram. Production Telegram `initData` validation is not implemented yet.
+
 ### Admin Web Panel: `apps/admin`
 
 Responsibilities:
@@ -72,7 +87,7 @@ Responsibilities:
 - Persist data through Prisma and PostgreSQL.
 - Run database migrations and seed test lockers.
 
-Current Stage 3 contents:
+Current backend contents:
 
 - Minimal NestJS application scaffold.
 - Global `/api` prefix.
@@ -116,7 +131,7 @@ Responsibilities:
 - Lists lockers.
 - Provides admin locker management.
 - Enforces locker status rules.
-- Implemented in Stage 3 for DB-backed locker listing only. Admin status management is still planned for Stage 4.
+- Implemented in Stage 3 for DB-backed locker listing. Admin status management was added in Stage 4.
 
 ### Sessions Module
 
@@ -323,6 +338,21 @@ GET  /api/admin/sessions/history
 
 All Stage 3 and Stage 4 business endpoints use `PrismaService` and the real PostgreSQL database. No in-memory storage or mock repositories are used.
 
+## Current TMA Backend Integration
+
+The Stage 5 TMA calls these backend endpoints:
+
+```txt
+POST /api/tma/users/upsert
+GET  /api/tma/me?telegramId=<telegram-id>
+GET  /api/tma/me/sessions/active?telegramId=<telegram-id>
+GET  /api/tma/me/sessions/history?telegramId=<telegram-id>
+POST /api/tma/sessions
+POST /api/tma/sessions/:id/finish
+```
+
+The frontend does not implement locker assignment locally. It sends the requested luggage size to the backend and displays the assigned locker returned by the API.
+
 ## User Flow
 
 ### Start Storage
@@ -385,5 +415,6 @@ The MVP intentionally excludes:
 - Real baggage dimension input.
 - Complex admin roles.
 - Production-grade Telegram auth hardening unless explicitly requested.
+- Production Telegram `initData` validation.
 
 These limitations keep the first version small, deployable, and testable.

@@ -2,7 +2,7 @@
 
 This document describes the planned VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 4: admin backend. The NestJS API, Prisma schema, initial migration, seed script, user/session/locker modules, public read-only endpoints, and JWT-protected admin backend exist under `backend/api`. Docker Compose, Nginx config, and frontend apps have not been implemented yet.
+The repository is currently at Stage 5: Telegram MiniApp frontend. The NestJS backend exists under `backend/api`, and the user-facing React + Vite Telegram MiniApp exists under `apps/tma`. Docker Compose, Nginx config, admin frontend, and public display frontend have not been implemented yet.
 
 ## VPS Assumptions
 
@@ -94,6 +94,7 @@ ADMIN_PASSWORD=change-me
 JWT_SECRET=change-me
 
 TMA_PUBLIC_API_BASE_URL=/api
+VITE_TMA_API_BASE_URL=/api
 ADMIN_PUBLIC_API_BASE_URL=/api
 DISPLAY_PUBLIC_API_BASE_URL=/api
 
@@ -108,6 +109,20 @@ Rules:
 - `.env.example` must contain placeholders only.
 - Any new variable must be documented in `.env.example`, `README.md`, and this file.
 - `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` are required for Stage 4 admin login and protected admin endpoints.
+- `VITE_TMA_API_BASE_URL` is used by the Stage 5 Vite TMA build. The default and planned routed value is `/api`.
+
+## Telegram MiniApp Build Notes
+
+Current local TMA commands:
+
+```sh
+cd apps/tma
+npm install
+npm run dev
+npm run build
+```
+
+For local development, `apps/tma/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, Nginx is planned to serve the built TMA and route `/api` to the backend.
 
 ## Migration and Seed Strategy
 

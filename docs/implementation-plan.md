@@ -495,6 +495,20 @@ Acceptance criteria:
 - Frontend build succeeds.
 - Documentation is updated.
 
+Current status:
+
+- Completed.
+
+Stage 5 result:
+
+- React + Vite + TypeScript TMA app implemented in `apps/tma`.
+- Mobile-first UI added for profile, balance, active sessions, history sessions, size selection, assigned locker confirmation, and finish action.
+- TMA integrates with the Stage 3 backend user/session endpoints.
+- Vite dev proxy routes `/api` to `http://localhost:3000` for local development.
+- `VITE_TMA_API_BASE_URL` added for frontend API base URL configuration.
+- MVP placeholder `telegramId` flow is documented; production Telegram `initData` validation is not implemented yet.
+- Frontend build passed.
+
 ### Stage 6: Admin Frontend
 
 Goals:

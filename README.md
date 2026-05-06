@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 4: admin backend. The NestJS API, Prisma schema, initial migration, seed script, user endpoints, locker endpoints, storage session flows, public read-only endpoints, and JWT-protected admin backend endpoints exist under `backend/api`. Frontend apps, Docker Compose services, and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 5: Telegram MiniApp frontend. The NestJS backend exists under `backend/api`, and the user-facing React + Vite + TypeScript Telegram MiniApp exists under `apps/tma`. Admin frontend, public display frontend, Docker Compose services, and Nginx configuration are planned but not implemented yet.
 
 ## MVP Scope
 
@@ -39,6 +39,9 @@ The MVP will not include:
 ./
 ├── apps/
 │   ├── tma/
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── vite.config.ts
 │   ├── admin/
 │   └── display/
 ├── backend/
@@ -63,7 +66,7 @@ The MVP will not include:
 
 Planned responsibilities:
 
-- `apps/tma`: Telegram MiniApp frontend.
+- `apps/tma`: React + Vite Telegram MiniApp frontend.
 - `apps/admin`: Admin web panel frontend.
 - `apps/display`: Public locker display frontend.
 - `backend/api`: NestJS backend API with Prisma schema, initial migration, and seed data.
@@ -130,12 +133,31 @@ GET  /api/admin/sessions/history
 
 The Stage 3 and Stage 4 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
 
+Telegram MiniApp frontend:
+
+```sh
+# from repository root
+cd apps/tma
+npm install
+npm run dev
+
+# production build
+npm run build
+```
+
+In local development, the TMA Vite dev server proxies `/api` to `http://localhost:3000`.
+
+The TMA reads its API base URL from:
+
+```txt
+VITE_TMA_API_BASE_URL=/api
+```
+
+If the variable is not set, the app defaults to `/api`.
+
 Planned future frontend flow:
 
 ```sh
-# start Telegram MiniApp frontend after app is scaffolded
-npm run dev:tma
-
 # start admin frontend after app is scaffolded
 npm run dev:admin
 
@@ -226,6 +248,21 @@ curl -X PATCH http://localhost:3000/api/admin/lockers/<locker-id>/status \
 
 Admin locker status changes only allow `AVAILABLE` and `MAINTENANCE`. `OCCUPIED` lockers cannot be changed manually; they are released by finishing active storage sessions.
 
+## Telegram MiniApp Notes
+
+The Stage 5 Telegram MiniApp implements the user-facing MVP flow:
+
+- profile and balance display;
+- active sessions;
+- history sessions;
+- start storage with `S`, `M`, `L`, or `XL`;
+- assigned locker confirmation;
+- finish storage action.
+
+For MVP, the app uses the current placeholder `telegramId` flow. It attempts to read `window.Telegram.WebApp.initDataUnsafe.user.id` when opened inside Telegram, and falls back to editable demo user `1001` outside Telegram.
+
+Production Telegram `initData` validation is not implemented yet.
+
 ## Planned Docker Compose Deployment Flow
 
 Docker Compose will be the required deployment path for the MVP. The planned services are:
@@ -285,6 +322,7 @@ ADMIN_LOGIN
 ADMIN_PASSWORD
 JWT_SECRET
 TMA_PUBLIC_API_BASE_URL
+VITE_TMA_API_BASE_URL
 ADMIN_PUBLIC_API_BASE_URL
 DISPLAY_PUBLIC_API_BASE_URL
 NGINX_HTTP_PORT

@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 4: admin backend.
+The repository is currently at Stage 5: Telegram MiniApp frontend.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, and JWT-protected admin backend exist under `backend/api`. Do not assume frontend apps, Docker Compose, or Nginx implementation files exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, and user-facing Telegram MiniApp frontend exist. Do not assume admin frontend, public display frontend, Docker Compose, or Nginx implementation files exist until you inspect the repository.
 
 ## Mandatory Files to Read Before Editing
 
@@ -222,6 +222,20 @@ Rules:
 - Allow admin locker status changes only between `AVAILABLE` and `MAINTENANCE`.
 - Do not allow admin requests to manually set a locker to `OCCUPIED`.
 - Do not allow admin status changes on currently `OCCUPIED` lockers; occupied lockers are released by finishing active storage sessions.
+
+## Telegram MiniApp Frontend Rules
+
+The Telegram MiniApp lives in `apps/tma`.
+
+Rules:
+
+- Keep the TMA mobile-first and simple.
+- Use the backend API for all user, balance, active session, history, start-session, and finish-session data.
+- Do not add in-memory fake sessions or fake locker assignment logic in the frontend.
+- Use `VITE_TMA_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
+- Keep the current placeholder `telegramId` flow until the user explicitly approves production Telegram `initData` validation.
+- Document clearly that production Telegram `initData` validation is not implemented yet.
+- Do not add payments, QR codes, WebSockets, or complex state management in the TMA MVP.
 
 ## Deployment Rules
 
