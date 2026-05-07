@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 5: Telegram MiniApp frontend. The NestJS backend exists under `backend/api`, and the user-facing React + Vite + TypeScript Telegram MiniApp exists under `apps/tma`. Admin frontend, public display frontend, Docker Compose services, and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 6: admin frontend. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, and the React + Vite + TypeScript admin frontend exists under `apps/admin`. Public display frontend, Docker Compose services, and Nginx configuration are planned but not implemented yet.
 
 ## MVP Scope
 
@@ -43,6 +43,9 @@ The MVP will not include:
 │   │   ├── package.json
 │   │   └── vite.config.ts
 │   ├── admin/
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── vite.config.ts
 │   └── display/
 ├── backend/
 │   └── api/
@@ -67,7 +70,7 @@ The MVP will not include:
 Planned responsibilities:
 
 - `apps/tma`: React + Vite Telegram MiniApp frontend.
-- `apps/admin`: Admin web panel frontend.
+- `apps/admin`: React + Vite admin web panel frontend.
 - `apps/display`: Public locker display frontend.
 - `backend/api`: NestJS backend API with Prisma schema, initial migration, and seed data.
 - `infra`: Docker Compose and Nginx deployment files.
@@ -158,9 +161,28 @@ If the variable is not set, the app defaults to `/api`.
 Planned future frontend flow:
 
 ```sh
-# start admin frontend after app is scaffolded
-npm run dev:admin
+# from repository root
+cd apps/admin
+npm install
+npm run dev
 
+# production build
+npm run build
+```
+
+In local development, the admin Vite dev server proxies `/api` to `http://localhost:3000`.
+
+The admin frontend reads its API base URL from:
+
+```txt
+VITE_ADMIN_API_BASE_URL=/api
+```
+
+If the variable is not set, the app defaults to `/api`.
+
+Planned future frontend flow:
+
+```sh
 # start display frontend after app is scaffolded
 npm run dev:display
 ```
@@ -248,6 +270,21 @@ curl -X PATCH http://localhost:3000/api/admin/lockers/<locker-id>/status \
 
 Admin locker status changes only allow `AVAILABLE` and `MAINTENANCE`. `OCCUPIED` lockers cannot be changed manually; they are released by finishing active storage sessions.
 
+## Admin Frontend Notes
+
+The Stage 6 admin frontend implements:
+
+- admin login;
+- JWT storage in `localStorage` for MVP;
+- dashboard stats;
+- lockers management;
+- users table;
+- sessions table with active, history, and all views;
+- locker status changes between `AVAILABLE` and `MAINTENANCE`;
+- backend error display.
+
+The admin frontend does not allow manually setting lockers to `OCCUPIED`.
+
 ## Telegram MiniApp Notes
 
 The Stage 5 Telegram MiniApp implements the user-facing MVP flow:
@@ -324,6 +361,7 @@ JWT_SECRET
 TMA_PUBLIC_API_BASE_URL
 VITE_TMA_API_BASE_URL
 ADMIN_PUBLIC_API_BASE_URL
+VITE_ADMIN_API_BASE_URL
 DISPLAY_PUBLIC_API_BASE_URL
 NGINX_HTTP_PORT
 NGINX_HTTPS_PORT

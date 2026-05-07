@@ -529,6 +529,20 @@ Acceptance criteria:
 - Frontend build succeeds.
 - Documentation is updated.
 
+Current status:
+
+- Completed.
+
+Stage 6 result:
+
+- React + Vite + TypeScript admin frontend implemented in `apps/admin`.
+- Desktop-friendly admin UI added with login, dashboard, lockers, users, and sessions views.
+- JWT is stored in `localStorage` for MVP.
+- Admin frontend integrates with the Stage 4 admin API.
+- Lockers page allows status changes only between `AVAILABLE` and `MAINTENANCE`.
+- `VITE_ADMIN_API_BASE_URL` added for frontend API base URL configuration.
+- Frontend build passed.
+
 ### Stage 7: Public Display Frontend
 
 Goals:

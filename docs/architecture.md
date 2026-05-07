@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository is currently at Stage 5: the NestJS backend exists under `backend/api`, and the user-facing Telegram MiniApp frontend exists under `apps/tma`.
+This document describes the planned architecture and current implementation. The repository is currently at Stage 6: the NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, and the admin frontend exists under `apps/admin`.
 
 ## System Overview
 
@@ -68,6 +68,19 @@ Responsibilities:
 - Change locker status between `AVAILABLE` and `MAINTENANCE`.
 - View active sessions.
 - View users.
+
+Current Stage 6 contents:
+
+- React + Vite + TypeScript app.
+- Desktop-friendly admin UI.
+- Login screen.
+- JWT stored in `localStorage` for MVP.
+- Dashboard stats.
+- Lockers management page.
+- Users page.
+- Sessions page with active, history, and all views.
+- Locker status updates only between `AVAILABLE` and `MAINTENANCE`.
+- API base URL read from `VITE_ADMIN_API_BASE_URL`, defaulting to `/api`.
 
 ### Public Display Page: `apps/display`
 
@@ -352,6 +365,24 @@ POST /api/tma/sessions/:id/finish
 ```
 
 The frontend does not implement locker assignment locally. It sends the requested luggage size to the backend and displays the assigned locker returned by the API.
+
+## Current Admin Frontend Integration
+
+The Stage 6 admin frontend calls these backend endpoints:
+
+```txt
+POST /api/admin/auth/login
+GET  /api/admin/auth/me
+GET  /api/admin/dashboard
+GET  /api/admin/users
+GET  /api/admin/lockers
+PATCH /api/admin/lockers/:id/status
+GET  /api/admin/sessions
+GET  /api/admin/sessions/active
+GET  /api/admin/sessions/history
+```
+
+The frontend does not implement locker status rules locally beyond hiding invalid `OCCUPIED` updates in the UI. The backend remains authoritative and rejects invalid status changes.
 
 ## User Flow
 

@@ -2,7 +2,7 @@
 
 This document describes the planned VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 5: Telegram MiniApp frontend. The NestJS backend exists under `backend/api`, and the user-facing React + Vite Telegram MiniApp exists under `apps/tma`. Docker Compose, Nginx config, admin frontend, and public display frontend have not been implemented yet.
+The repository is currently at Stage 6: admin frontend. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, and the React + Vite admin frontend exists under `apps/admin`. Docker Compose, Nginx config, and public display frontend have not been implemented yet.
 
 ## VPS Assumptions
 
@@ -96,6 +96,7 @@ JWT_SECRET=change-me
 TMA_PUBLIC_API_BASE_URL=/api
 VITE_TMA_API_BASE_URL=/api
 ADMIN_PUBLIC_API_BASE_URL=/api
+VITE_ADMIN_API_BASE_URL=/api
 DISPLAY_PUBLIC_API_BASE_URL=/api
 
 NGINX_HTTP_PORT=80
@@ -110,6 +111,7 @@ Rules:
 - Any new variable must be documented in `.env.example`, `README.md`, and this file.
 - `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` are required for Stage 4 admin login and protected admin endpoints.
 - `VITE_TMA_API_BASE_URL` is used by the Stage 5 Vite TMA build. The default and planned routed value is `/api`.
+- `VITE_ADMIN_API_BASE_URL` is used by the Stage 6 Vite admin build. The default and planned routed value is `/api`.
 
 ## Telegram MiniApp Build Notes
 
@@ -123,6 +125,19 @@ npm run build
 ```
 
 For local development, `apps/tma/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, Nginx is planned to serve the built TMA and route `/api` to the backend.
+
+## Admin Frontend Build Notes
+
+Current local admin commands:
+
+```sh
+cd apps/admin
+npm install
+npm run dev
+npm run build
+```
+
+For local development, `apps/admin/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, Nginx is planned to serve the built admin app and route `/api` to the backend.
 
 ## Migration and Seed Strategy
 

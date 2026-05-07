@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 5: Telegram MiniApp frontend.
+The repository is currently at Stage 6: admin frontend.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, and user-facing Telegram MiniApp frontend exist. Do not assume admin frontend, public display frontend, Docker Compose, or Nginx implementation files exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, and admin frontend exist. Do not assume public display frontend, Docker Compose, or Nginx implementation files exist until you inspect the repository.
 
 ## Mandatory Files to Read Before Editing
 
@@ -236,6 +236,20 @@ Rules:
 - Keep the current placeholder `telegramId` flow until the user explicitly approves production Telegram `initData` validation.
 - Document clearly that production Telegram `initData` validation is not implemented yet.
 - Do not add payments, QR codes, WebSockets, or complex state management in the TMA MVP.
+
+## Admin Frontend Rules
+
+The admin frontend lives in `apps/admin`.
+
+Rules:
+
+- Keep the admin UI desktop-friendly, simple, and operational.
+- Use the Stage 4 admin API for login, dashboard, users, lockers, and sessions.
+- Store the JWT in `localStorage` only for MVP.
+- Use `VITE_ADMIN_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
+- Do not implement advanced roles, permissions, or an `AdminUser` table.
+- Do not allow manually setting lockers to `OCCUPIED`.
+- Do not add payments, public display UI, Docker, Nginx, or complex state management as part of admin frontend work.
 
 ## Deployment Rules
 
