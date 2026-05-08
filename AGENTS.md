@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 6: admin frontend.
+The repository is currently at Stage 7: public display frontend.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, and admin frontend exist. Do not assume public display frontend, Docker Compose, or Nginx implementation files exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, admin frontend, and public display frontend exist. Do not assume Docker Compose or Nginx implementation files exist until you inspect the repository.
 
 ## Mandatory Files to Read Before Editing
 
@@ -250,6 +250,20 @@ Rules:
 - Do not implement advanced roles, permissions, or an `AdminUser` table.
 - Do not allow manually setting lockers to `OCCUPIED`.
 - Do not add payments, public display UI, Docker, Nginx, or complex state management as part of admin frontend work.
+
+## Public Display Frontend Rules
+
+The public display frontend lives in `apps/display`.
+
+Rules:
+
+- Keep the display read-only and unauthenticated.
+- Use the Stage 3 public API for lockers and stats.
+- Use `VITE_DISPLAY_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
+- Use polling every few seconds for updates.
+- Show locker code, size, and status.
+- Clearly distinguish `AVAILABLE`, `OCCUPIED`, and `MAINTENANCE`.
+- Do not add admin controls, payments, QR codes, WebSockets, Docker, Nginx, or complex state management as part of public display frontend work.
 
 ## Deployment Rules
 

@@ -251,6 +251,7 @@ MAINTENANCE
 
 ```txt
 GET /api/public/lockers
+GET /api/public/stats
 ```
 
 ## 6. Frontend Apps and Pages
@@ -291,11 +292,13 @@ Dashboard stats:
 Planned views:
 
 - Locker grid page.
+- Public stats summary.
 
 Behavior:
 
 - No authentication.
-- Poll `/api/public/lockers` every few seconds.
+- Poll `/api/public/lockers` and `/api/public/stats` every few seconds.
+- Show locker code, size, and status.
 - Show statuses clearly: `AVAILABLE`, `OCCUPIED`, `MAINTENANCE`.
 
 ## 7. Docker Compose and VPS Deployment
@@ -559,6 +562,20 @@ Acceptance criteria:
 - Polling refreshes data.
 - Frontend build succeeds.
 - Documentation is updated.
+
+Current status:
+
+- Completed.
+
+Stage 7 result:
+
+- React + Vite + TypeScript public display frontend implemented in `apps/display`.
+- Read-only responsive display UI added with locker grid, locker code, locker size, locker status, and public stats.
+- Display integrates with `GET /api/public/lockers` and `GET /api/public/stats`.
+- Data polling refreshes lockers and stats every 5 seconds.
+- Vite dev proxy routes `/api` to `http://localhost:3000` for local development.
+- `VITE_DISPLAY_API_BASE_URL` added for frontend API base URL configuration.
+- Frontend build passed.
 
 ### Stage 8: Docker and Nginx
 

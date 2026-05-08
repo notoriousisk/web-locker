@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 6: admin frontend. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, and the React + Vite + TypeScript admin frontend exists under `apps/admin`. Public display frontend, Docker Compose services, and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 7: public display frontend. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, and the public display frontend exists under `apps/display`. Docker Compose services and Nginx configuration are planned but not implemented yet.
 
 ## MVP Scope
 
@@ -47,6 +47,9 @@ The MVP will not include:
 │   │   ├── package.json
 │   │   └── vite.config.ts
 │   └── display/
+│       ├── src/
+│       ├── package.json
+│       └── vite.config.ts
 ├── backend/
 │   └── api/
 │       ├── prisma/
@@ -71,7 +74,7 @@ Planned responsibilities:
 
 - `apps/tma`: React + Vite Telegram MiniApp frontend.
 - `apps/admin`: React + Vite admin web panel frontend.
-- `apps/display`: Public locker display frontend.
+- `apps/display`: React + Vite public locker display frontend.
 - `backend/api`: NestJS backend API with Prisma schema, initial migration, and seed data.
 - `infra`: Docker Compose and Nginx deployment files.
 - `docs`: architecture, deployment, and implementation planning documents.
@@ -158,7 +161,7 @@ VITE_TMA_API_BASE_URL=/api
 
 If the variable is not set, the app defaults to `/api`.
 
-Planned future frontend flow:
+Admin frontend flow:
 
 ```sh
 # from repository root
@@ -180,14 +183,27 @@ VITE_ADMIN_API_BASE_URL=/api
 
 If the variable is not set, the app defaults to `/api`.
 
-Planned future frontend flow:
+Public display frontend:
 
 ```sh
-# start display frontend after app is scaffolded
-npm run dev:display
+# from repository root
+cd apps/display
+npm install
+npm run dev
+
+# production build
+npm run build
 ```
 
-The exact commands must be updated when package scripts are added.
+In local development, the display Vite dev server proxies `/api` to `http://localhost:3000`.
+
+The display frontend reads its API base URL from:
+
+```txt
+VITE_DISPLAY_API_BASE_URL=/api
+```
+
+If the variable is not set, the app defaults to `/api`.
 
 ## Backend Database Commands
 
@@ -284,6 +300,18 @@ The Stage 6 admin frontend implements:
 - backend error display.
 
 The admin frontend does not allow manually setting lockers to `OCCUPIED`.
+
+## Public Display Notes
+
+The Stage 7 public display frontend implements:
+
+- unauthenticated read-only locker grid;
+- locker code, size, and status display;
+- public stats summary;
+- clear visual states for `AVAILABLE`, `OCCUPIED`, and `MAINTENANCE`;
+- polling every 5 seconds through the public backend API.
+
+The display frontend does not include admin controls, QR codes, WebSockets, payments, Docker, or Nginx implementation.
 
 ## Telegram MiniApp Notes
 

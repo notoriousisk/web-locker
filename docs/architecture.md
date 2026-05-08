@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository is currently at Stage 6: the NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, and the admin frontend exists under `apps/admin`.
+This document describes the planned architecture and current implementation. The repository is currently at Stage 7: the NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, and the public display frontend exists under `apps/display`.
 
 ## System Overview
 
@@ -87,9 +87,22 @@ Current Stage 6 contents:
 Responsibilities:
 
 - Show all lockers in a visual grid.
+- Show locker code and size.
 - Show locker status as `AVAILABLE`, `OCCUPIED`, or `MAINTENANCE`.
+- Show basic public stats.
 - Poll the backend every few seconds.
 - Require no authentication.
+
+Current Stage 7 contents:
+
+- React + Vite + TypeScript app.
+- Responsive read-only public display UI.
+- Locker grid with code, size, and status.
+- Public stats summary.
+- Clear visual styling for `AVAILABLE`, `OCCUPIED`, and `MAINTENANCE`.
+- Polling every 5 seconds.
+- Vite dev proxy from `/api` to `http://localhost:3000`.
+- API base URL read from `VITE_DISPLAY_API_BASE_URL`, defaulting to `/api`.
 
 ### Backend API: `backend/api`
 
