@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository is currently at Stage 7: the NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, and the public display frontend exists under `apps/display`.
+This document describes the planned architecture and current implementation. The repository is currently at Stage 8: the NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, and Docker Compose/Nginx deployment files exist under `infra`.
 
 ## System Overview
 
@@ -135,6 +135,16 @@ Responsibilities:
 - Define Docker Compose services.
 - Define Nginx routing.
 - Support VPS deployment without manual Node.js installation.
+
+Current Stage 8 contents:
+
+- `infra/docker-compose.yml` defines `postgres`, `api`, `tma`, `admin`, `display`, and `nginx` services.
+- `postgres` uses a persistent `postgres_data` volume.
+- `api` builds from `backend/api/Dockerfile`, connects to PostgreSQL through `DATABASE_URL`, and runs `prisma migrate deploy` before starting NestJS.
+- `tma`, `admin`, and `display` build static Vite assets and serve them through app-local Nginx containers.
+- `infra/nginx/nginx.conf` is the public reverse proxy.
+- Public routing maps `/api` to the API, `/tma` to the Telegram MiniApp, `/admin` to the admin frontend, and `/display` to the public display frontend.
+- Frontend Docker builds pass Vite base paths for their route prefixes: `/tma/`, `/admin/`, and `/display/`.
 
 ## Planned Backend Modules
 

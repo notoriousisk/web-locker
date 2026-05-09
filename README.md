@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 7: public display frontend. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, and the public display frontend exists under `apps/display`. Docker Compose services and Nginx configuration are planned but not implemented yet.
+This repository is currently at Stage 8: Docker Compose and Nginx deployment. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, and Docker Compose deployment files exist under `infra`.
 
 ## MVP Scope
 
@@ -52,6 +52,7 @@ The MVP will not include:
 │       └── vite.config.ts
 ├── backend/
 │   └── api/
+│       ├── Dockerfile
 │       ├── prisma/
 │       │   ├── migrations/
 │       │   ├── schema.prisma
@@ -60,7 +61,9 @@ The MVP will not include:
 │       ├── package.json
 │       └── prisma.config.ts
 ├── infra/
+│   ├── docker-compose.yml
 │   └── nginx/
+│       └── nginx.conf
 ├── docs/
 │   ├── architecture.md
 │   ├── deployment.md
@@ -157,9 +160,10 @@ The TMA reads its API base URL from:
 
 ```txt
 VITE_TMA_API_BASE_URL=/api
+VITE_TMA_BASE_PATH=/tma/
 ```
 
-If the variable is not set, the app defaults to `/api`.
+If `VITE_TMA_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_TMA_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/tma/`.
 
 Admin frontend flow:
 
@@ -179,9 +183,10 @@ The admin frontend reads its API base URL from:
 
 ```txt
 VITE_ADMIN_API_BASE_URL=/api
+VITE_ADMIN_BASE_PATH=/admin/
 ```
 
-If the variable is not set, the app defaults to `/api`.
+If `VITE_ADMIN_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_ADMIN_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/admin/`.
 
 Public display frontend:
 
@@ -201,9 +206,10 @@ The display frontend reads its API base URL from:
 
 ```txt
 VITE_DISPLAY_API_BASE_URL=/api
+VITE_DISPLAY_BASE_PATH=/display/
 ```
 
-If the variable is not set, the app defaults to `/api`.
+If `VITE_DISPLAY_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_DISPLAY_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/display/`.
 
 ## Backend Database Commands
 
@@ -328,9 +334,9 @@ For MVP, the app uses the current placeholder `telegramId` flow. It attempts to 
 
 Production Telegram `initData` validation is not implemented yet.
 
-## Planned Docker Compose Deployment Flow
+## Docker Compose Deployment Flow
 
-Docker Compose will be the required deployment path for the MVP. The planned services are:
+Docker Compose is the required deployment path for the MVP. The services are:
 
 - `postgres`
 - `api`
@@ -339,15 +345,25 @@ Docker Compose will be the required deployment path for the MVP. The planned ser
 - `display`
 - `nginx`
 
-Expected future flow:
+Deployment flow:
 
 ```sh
 cp .env.example .env
 # edit .env with environment-specific values
-docker compose -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```
 
-The Docker Compose file has not been created yet. This section must be updated when infra is implemented.
+The `api` container runs `prisma migrate deploy` before starting the NestJS server. Seed data is applied separately when needed:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
+```
+
+Stop services with:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml down
+```
 
 ## Planned VPS Deployment Flow
 
@@ -373,9 +389,9 @@ See [docs/deployment.md](docs/deployment.md) for the deployment strategy.
 
 ## Required Environment Variables
 
-Planned variables are listed in [.env.example](.env.example).
+Variables are listed in [.env.example](.env.example).
 
-Required planned variables:
+Required variables:
 
 ```txt
 POSTGRES_DB
@@ -388,9 +404,13 @@ ADMIN_PASSWORD
 JWT_SECRET
 TMA_PUBLIC_API_BASE_URL
 VITE_TMA_API_BASE_URL
+VITE_TMA_BASE_PATH
 ADMIN_PUBLIC_API_BASE_URL
 VITE_ADMIN_API_BASE_URL
+VITE_ADMIN_BASE_PATH
 DISPLAY_PUBLIC_API_BASE_URL
+VITE_DISPLAY_API_BASE_URL
+VITE_DISPLAY_BASE_PATH
 NGINX_HTTP_PORT
 NGINX_HTTPS_PORT
 PUBLIC_DOMAIN
@@ -398,9 +418,13 @@ PUBLIC_DOMAIN
 
 Never commit real secrets. `.env.example` must contain placeholders only.
 
+In Docker Compose, `API_PORT` should remain `3000` because Nginx routes to the API container on that port. Use `NGINX_HTTP_PORT` to change the host-facing HTTP port.
+
+`NGINX_HTTPS_PORT` is reserved for a later direct-TLS Nginx setup. The current Compose file publishes HTTP only; terminate HTTPS with a VPS-level proxy or add and document TLS support later.
+
 ## Useful Commands
 
-These commands are planned and must be verified or updated as implementation progresses:
+Useful local and deployment commands:
 
 ```sh
 # backend only
@@ -411,19 +435,19 @@ npm run build
 npm run lint
 
 # start all services through Docker Compose
-docker compose -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 
 # stop all services
-docker compose -f infra/docker-compose.yml down
+docker compose --env-file .env -f infra/docker-compose.yml down
 
 # view logs
-docker compose -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
 
 # run Prisma migrations
-docker compose -f infra/docker-compose.yml exec api npx prisma migrate deploy
+docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
 
 # seed test data
-docker compose -f infra/docker-compose.yml exec api npm run db:seed
+docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
 ```
 
 Commands that do not exist yet must be implemented or corrected during later stages.

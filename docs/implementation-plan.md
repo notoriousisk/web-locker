@@ -595,6 +595,24 @@ Acceptance criteria:
 - Migrations and seed commands work inside containers.
 - VPS deployment docs are accurate.
 
+Current status:
+
+- Completed.
+
+Stage 8 result:
+
+- Dockerfile added for backend API.
+- Dockerfile added for Telegram MiniApp frontend.
+- Dockerfile added for admin frontend.
+- Dockerfile added for public display frontend.
+- Docker Compose added at `infra/docker-compose.yml` with `postgres`, `api`, `tma`, `admin`, `display`, and `nginx` services.
+- PostgreSQL uses a persistent `postgres_data` volume.
+- API service connects to PostgreSQL through `DATABASE_URL` and runs `prisma migrate deploy` on startup.
+- Nginx reverse proxy added at `infra/nginx/nginx.conf`.
+- Routes implemented for `/api`, `/tma`, `/admin`, and `/display`.
+- Frontend production base paths are wired through `VITE_TMA_BASE_PATH`, `VITE_ADMIN_BASE_PATH`, and `VITE_DISPLAY_BASE_PATH`.
+- Deployment documentation updated with service details, commands, logs, restart, backup, and restore notes.
+
 ### Stage 9: Verification and Cleanup
 
 Goals:

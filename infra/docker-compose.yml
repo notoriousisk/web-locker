@@ -1,0 +1,103 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - locker_mvp
+
+  api:
+    build:
+      context: ../backend/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      API_PORT: 3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - locker_mvp
+
+  tma:
+    build:
+      context: ../apps/tma
+      dockerfile: Dockerfile
+      args:
+        VITE_TMA_API_BASE_URL: ${VITE_TMA_API_BASE_URL:-/api}
+        VITE_TMA_BASE_PATH: ${VITE_TMA_BASE_PATH:-/tma/}
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - locker_mvp
+
+  admin:
+    build:
+      context: ../apps/admin
+      dockerfile: Dockerfile
+      args:
+        VITE_ADMIN_API_BASE_URL: ${VITE_ADMIN_API_BASE_URL:-/api}
+        VITE_ADMIN_BASE_PATH: ${VITE_ADMIN_BASE_PATH:-/admin/}
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - locker_mvp
+
+  display:
+    build:
+      context: ../apps/display
+      dockerfile: Dockerfile
+      args:
+        VITE_DISPLAY_API_BASE_URL: ${VITE_DISPLAY_API_BASE_URL:-/api}
+        VITE_DISPLAY_BASE_PATH: ${VITE_DISPLAY_BASE_PATH:-/display/}
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - locker_mvp
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      tma:
+        condition: service_started
+      admin:
+        condition: service_started
+      display:
+        condition: service_started
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - locker_mvp
+
+volumes:
+  postgres_data:
+
+networks:
+  locker_mvp:
+    driver: bridge

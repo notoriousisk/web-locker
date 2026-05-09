@@ -1,8 +1,8 @@
 # Deployment
 
-This document describes the planned VPS deployment strategy for `locker-mvp`.
+This document describes the VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 7: public display frontend. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, and the React + Vite public display frontend exists under `apps/display`. Docker Compose and Nginx config have not been implemented yet.
+The repository is currently at Stage 8: Docker Compose and Nginx deployment. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, and Docker Compose/Nginx deployment files exist under `infra`.
 
 ## VPS Assumptions
 
@@ -20,7 +20,7 @@ Application build and runtime must happen inside Docker containers.
 
 ## Docker Compose Deployment Strategy
 
-Planned Docker Compose services:
+Docker Compose services:
 
 - `postgres`: PostgreSQL database.
 - `api`: NestJS backend API.
@@ -29,29 +29,37 @@ Planned Docker Compose services:
 - `display`: built public display frontend.
 - `nginx`: public reverse proxy.
 
-Expected future deployment command:
+Deployment command:
 
 ```sh
-docker compose -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```
 
-Expected future shutdown command:
+Shutdown command:
 
 ```sh
-docker compose -f infra/docker-compose.yml down
+docker compose --env-file .env -f infra/docker-compose.yml down
 ```
 
-The actual Compose file must be created in a later stage at:
+The Compose file is:
 
 ```txt
 infra/docker-compose.yml
 ```
 
-When Docker Compose is implemented, this document must be updated with exact service names, volumes, networks, health checks, and commands.
+Service details:
 
-## Planned Nginx Routes
+- `postgres`: `postgres:16-alpine`, persistent `postgres_data` volume, `pg_isready` health check.
+- `api`: builds `backend/api/Dockerfile`, reads `.env`, waits for healthy PostgreSQL, runs `prisma migrate deploy`, then starts `node dist/main.js` on container port `3000`.
+- `tma`: builds `apps/tma/Dockerfile` and serves the built Vite app under `/tma/`.
+- `admin`: builds `apps/admin/Dockerfile` and serves the built Vite app under `/admin/`.
+- `display`: builds `apps/display/Dockerfile` and serves the built Vite app under `/display/`.
+- `nginx`: `nginx:1.27-alpine`, mounts `infra/nginx/nginx.conf`, publishes `${NGINX_HTTP_PORT:-80}:80`.
+- All services share the `locker_mvp` bridge network.
 
-Production should support this routing layout:
+## Nginx Routes
+
+Production supports this routing layout:
 
 ```txt
 https://example.com/tma      -> Telegram MiniApp frontend
@@ -69,17 +77,17 @@ Nginx responsibilities:
 - Support SPA fallback for frontend routes.
 - Preserve API paths under `/api`.
 
-The planned Nginx config path is:
+The Nginx config path is:
 
 ```txt
 infra/nginx/nginx.conf
 ```
 
-TLS termination may be handled by Nginx or an external VPS-level proxy, but this must be documented when implemented.
+This MVP config serves HTTP on container port `80`. TLS can be terminated by a VPS-level proxy, load balancer, or a later Nginx TLS update; document that choice before enabling HTTPS directly in this repository.
 
 ## Environment Variables
 
-Planned variables:
+Variables:
 
 ```txt
 POSTGRES_DB=locker_mvp
@@ -95,10 +103,13 @@ JWT_SECRET=change-me
 
 TMA_PUBLIC_API_BASE_URL=/api
 VITE_TMA_API_BASE_URL=/api
+VITE_TMA_BASE_PATH=/tma/
 ADMIN_PUBLIC_API_BASE_URL=/api
 VITE_ADMIN_API_BASE_URL=/api
+VITE_ADMIN_BASE_PATH=/admin/
 DISPLAY_PUBLIC_API_BASE_URL=/api
 VITE_DISPLAY_API_BASE_URL=/api
+VITE_DISPLAY_BASE_PATH=/display/
 
 NGINX_HTTP_PORT=80
 NGINX_HTTPS_PORT=443
@@ -111,9 +122,12 @@ Rules:
 - `.env.example` must contain placeholders only.
 - Any new variable must be documented in `.env.example`, `README.md`, and this file.
 - `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` are required for Stage 4 admin login and protected admin endpoints.
-- `VITE_TMA_API_BASE_URL` is used by the Stage 5 Vite TMA build. The default and planned routed value is `/api`.
-- `VITE_ADMIN_API_BASE_URL` is used by the Stage 6 Vite admin build. The default and planned routed value is `/api`.
-- `VITE_DISPLAY_API_BASE_URL` is used by the Stage 7 Vite public display build. The default and planned routed value is `/api`.
+- `API_PORT` is fixed to `3000` inside Docker Compose so Nginx can route to the API service. Change `NGINX_HTTP_PORT` to alter the host-facing HTTP port.
+- `VITE_TMA_API_BASE_URL` is used by the Stage 5 Vite TMA build. The default routed value is `/api`.
+- `VITE_ADMIN_API_BASE_URL` is used by the Stage 6 Vite admin build. The default routed value is `/api`.
+- `VITE_DISPLAY_API_BASE_URL` is used by the Stage 7 Vite public display build. The default routed value is `/api`.
+- `VITE_TMA_BASE_PATH`, `VITE_ADMIN_BASE_PATH`, and `VITE_DISPLAY_BASE_PATH` are used by production Vite builds so static assets resolve under `/tma/`, `/admin/`, and `/display/`.
+- `NGINX_HTTPS_PORT` is reserved for a later direct-TLS Nginx setup. The current Compose file publishes HTTP only and expects HTTPS to be terminated outside this container stack if needed.
 
 ## Telegram MiniApp Build Notes
 
@@ -126,7 +140,7 @@ npm run dev
 npm run build
 ```
 
-For local development, `apps/tma/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, Nginx is planned to serve the built TMA and route `/api` to the backend.
+For local development, `apps/tma/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, the TMA Docker image builds with `VITE_TMA_BASE_PATH=/tma/`, serves static files through Nginx, and the public reverse proxy routes `/tma` to that container.
 
 ## Admin Frontend Build Notes
 
@@ -139,7 +153,7 @@ npm run dev
 npm run build
 ```
 
-For local development, `apps/admin/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, Nginx is planned to serve the built admin app and route `/api` to the backend.
+For local development, `apps/admin/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, the admin Docker image builds with `VITE_ADMIN_BASE_PATH=/admin/`, serves static files through Nginx, and the public reverse proxy routes `/admin` to that container.
 
 ## Public Display Frontend Build Notes
 
@@ -152,7 +166,7 @@ npm run dev
 npm run build
 ```
 
-For local development, `apps/display/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, Nginx is planned to serve the built display app and route `/api` to the backend.
+For local development, `apps/display/vite.config.ts` proxies `/api` to `http://localhost:3000`. In VPS deployment, the display Docker image builds with `VITE_DISPLAY_BASE_PATH=/display/`, serves static files through Nginx, and the public reverse proxy routes `/display` to that container.
 
 ## Migration and Seed Strategy
 
@@ -190,22 +204,22 @@ npm run db:seed
 
 Stage 3 local API verification requires a running PostgreSQL database because the core flows use the real database through Prisma. There is no mock or in-memory backend mode.
 
-Planned production migration command:
+Production migration command:
 
 ```sh
-docker compose -f infra/docker-compose.yml exec api npx prisma migrate deploy
+docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
 ```
 
-Planned development migration command:
+Development migration command:
 
 ```sh
-docker compose -f infra/docker-compose.yml exec api npx prisma migrate dev
+docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate dev
 ```
 
-Planned seed command:
+Seed command:
 
 ```sh
-docker compose -f infra/docker-compose.yml exec api npm run db:seed
+docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
 ```
 
 Seed data should include test lockers with different sizes and grid positions.
@@ -226,45 +240,45 @@ Migration rules:
 
 ## Logs and Restart Commands
 
-Planned log commands:
+Log commands:
 
 ```sh
 # all services
-docker compose -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
 
 # API only
-docker compose -f infra/docker-compose.yml logs -f api
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
 
 # Nginx only
-docker compose -f infra/docker-compose.yml logs -f nginx
+docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
 
 # PostgreSQL only
-docker compose -f infra/docker-compose.yml logs -f postgres
+docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
 ```
 
-Planned restart commands:
+Restart commands:
 
 ```sh
 # restart all services
-docker compose -f infra/docker-compose.yml restart
+docker compose --env-file .env -f infra/docker-compose.yml restart
 
 # restart API only
-docker compose -f infra/docker-compose.yml restart api
+docker compose --env-file .env -f infra/docker-compose.yml restart api
 
 # rebuild and restart
-docker compose -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```
 
-These commands must be verified after Docker Compose is implemented.
+The `api` service also runs `prisma migrate deploy` automatically on container start.
 
 ## Backup Notes
 
 PostgreSQL data is the critical state for MVP.
 
-Planned backup command:
+Backup command:
 
 ```sh
-docker compose -f infra/docker-compose.yml exec postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > locker-mvp-backup.sql
+docker compose --env-file .env -f infra/docker-compose.yml exec postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > locker-mvp-backup.sql
 ```
 
 If shell environment variables are not available on the host, replace them with the actual deployment values.
@@ -278,7 +292,7 @@ Backup recommendations:
 
 ## Restore Notes
 
-Planned restore flow on a new VPS:
+Restore flow on a new VPS:
 
 1. Install Docker, Docker Compose, and Git.
 2. Clone the repository.
@@ -287,13 +301,13 @@ Planned restore flow on a new VPS:
 5. Restore the database dump.
 6. Start or restart all services.
 
-Planned restore command:
+Restore command:
 
 ```sh
-cat locker-mvp-backup.sql | docker compose -f infra/docker-compose.yml exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
+cat locker-mvp-backup.sql | docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
 ```
 
-The exact restore process must be verified after Docker Compose and database services are implemented.
+Run restore commands only after `postgres` is healthy and before exposing a restored production instance to users.
 
 ## What Should Not Be Installed Manually on the VPS
 

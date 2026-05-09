@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 7: public display frontend.
+The repository is currently at Stage 8: Docker Compose and Nginx deployment.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, admin frontend, and public display frontend exist. Do not assume Docker Compose or Nginx implementation files exist until you inspect the repository.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, and Nginx routing config exist.
 
 ## Mandatory Files to Read Before Editing
 
@@ -174,8 +174,10 @@ Rules:
 - Keep service names stable and documented.
 - Keep environment variables documented in `.env.example`, `README.md`, and `docs/deployment.md`.
 - Update `docs/deployment.md` after every Docker or Nginx change.
+- Keep production frontend base paths aligned with Nginx routes: `/tma/`, `/admin/`, and `/display/`.
+- Do not require manual migrations outside Docker for VPS deployment; use the `api` container.
 
-Planned services:
+Services:
 
 - `postgres`
 - `api`
@@ -233,6 +235,7 @@ Rules:
 - Use the backend API for all user, balance, active session, history, start-session, and finish-session data.
 - Do not add in-memory fake sessions or fake locker assignment logic in the frontend.
 - Use `VITE_TMA_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
+- Use `VITE_TMA_BASE_PATH` for the production Vite base path, defaulting to `/tma/` in Docker.
 - Keep the current placeholder `telegramId` flow until the user explicitly approves production Telegram `initData` validation.
 - Document clearly that production Telegram `initData` validation is not implemented yet.
 - Do not add payments, QR codes, WebSockets, or complex state management in the TMA MVP.
@@ -247,6 +250,7 @@ Rules:
 - Use the Stage 4 admin API for login, dashboard, users, lockers, and sessions.
 - Store the JWT in `localStorage` only for MVP.
 - Use `VITE_ADMIN_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
+- Use `VITE_ADMIN_BASE_PATH` for the production Vite base path, defaulting to `/admin/` in Docker.
 - Do not implement advanced roles, permissions, or an `AdminUser` table.
 - Do not allow manually setting lockers to `OCCUPIED`.
 - Do not add payments, public display UI, Docker, Nginx, or complex state management as part of admin frontend work.
@@ -260,6 +264,7 @@ Rules:
 - Keep the display read-only and unauthenticated.
 - Use the Stage 3 public API for lockers and stats.
 - Use `VITE_DISPLAY_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
+- Use `VITE_DISPLAY_BASE_PATH` for the production Vite base path, defaulting to `/display/` in Docker.
 - Use polling every few seconds for updates.
 - Show locker code, size, and status.
 - Clearly distinguish `AVAILABLE`, `OCCUPIED`, and `MAINTENANCE`.
