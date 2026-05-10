@@ -635,6 +635,20 @@ Acceptance criteria:
 - Documentation matches implementation.
 - Known limitations are documented.
 
+Current status:
+
+- Completed.
+
+Stage 9 result:
+
+- Backend Prisma generation, Prisma schema validation, lint, and build were verified.
+- Telegram MiniApp, admin frontend, and public display frontend builds were verified.
+- Docker Compose YAML was statically parsed and checked for expected service names.
+- Docker and Nginx runtime checks could not be run in the local environment because the `docker` and `nginx` CLIs were unavailable.
+- Start/stop helper scripts were added under `scripts`.
+- README and deployment docs now include full-stack start, stop, restart, logs, migration, seed, and browser URL instructions.
+- No product features were added.
+
 ## 10. Current Project Assumptions
 
 - One locker location only.

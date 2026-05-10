@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository is currently at Stage 8: Docker Compose and Nginx deployment. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, and Docker Compose deployment files exist under `infra`.
+This repository is currently at Stage 9: final verification, cleanup, and start instructions. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## MVP Scope
 
@@ -64,6 +64,9 @@ The MVP will not include:
 │   ├── docker-compose.yml
 │   └── nginx/
 │       └── nginx.conf
+├── scripts/
+│   ├── start-dev.sh
+│   └── stop-dev.sh
 ├── docs/
 │   ├── architecture.md
 │   ├── deployment.md
@@ -80,6 +83,7 @@ Planned responsibilities:
 - `apps/display`: React + Vite public locker display frontend.
 - `backend/api`: NestJS backend API with Prisma schema, initial migration, and seed data.
 - `infra`: Docker Compose and Nginx deployment files.
+- `scripts`: simple Docker Compose start/stop helpers.
 - `docs`: architecture, deployment, and implementation planning documents.
 
 ## Implementation Plan
@@ -334,6 +338,71 @@ For MVP, the app uses the current placeholder `telegramId` flow. It attempts to 
 
 Production Telegram `initData` validation is not implemented yet.
 
+## How To Start The Whole Project
+
+The full MVP runs through Docker Compose. The VPS and local Docker flow are the same.
+
+First create a local `.env` from placeholders:
+
+```sh
+cp .env.example .env
+```
+
+Edit `.env` before production use. At minimum, replace `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
+
+Start the full stack with attached logs:
+
+```sh
+./scripts/start-dev.sh
+```
+
+This runs:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml up --build
+```
+
+Press `Ctrl+C` to stop the attached Compose run. To stop and remove the stack from another terminal:
+
+```sh
+./scripts/stop-dev.sh
+```
+
+Browser URLs after startup:
+
+```txt
+http://localhost/api/health
+http://localhost/tma
+http://localhost/admin
+http://localhost/display
+```
+
+Apply migrations manually if needed:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
+```
+
+The `api` container also runs `prisma migrate deploy` automatically on startup.
+
+Seed deterministic demo lockers:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
+```
+
+View logs:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
+```
+
+Restart all services:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml restart
+```
+
 ## Docker Compose Deployment Flow
 
 Docker Compose is the required deployment path for the MVP. The services are:
@@ -450,7 +519,7 @@ docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma m
 docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
 ```
 
-Commands that do not exist yet must be implemented or corrected during later stages.
+If any documented command fails, fix the command or update the documentation in the same change.
 
 ## Documentation Maintenance Rule
 

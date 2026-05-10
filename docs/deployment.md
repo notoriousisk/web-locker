@@ -2,7 +2,7 @@
 
 This document describes the VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 8: Docker Compose and Nginx deployment. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, and Docker Compose/Nginx deployment files exist under `infra`.
+The repository is currently at Stage 9: final verification, cleanup, and start instructions. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## VPS Assumptions
 
@@ -17,6 +17,77 @@ The VPS should have only these host-level requirements:
 Do not require manual installation of Node.js, npm, PostgreSQL, Prisma, or frontend build tooling on the VPS host.
 
 Application build and runtime must happen inside Docker containers.
+
+## How To Start The Whole Project
+
+The full MVP runs through Docker Compose.
+
+Create an environment file:
+
+```sh
+cp .env.example .env
+```
+
+Before production use, edit `.env` and replace placeholder secrets, especially `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
+
+Start the full stack with attached logs:
+
+```sh
+./scripts/start-dev.sh
+```
+
+The helper runs:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml up --build
+```
+
+Press `Ctrl+C` to stop the attached Compose run. To stop and remove the stack explicitly:
+
+```sh
+./scripts/stop-dev.sh
+```
+
+The stop helper runs:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml down
+```
+
+Expected local URLs:
+
+```txt
+http://localhost/api/health
+http://localhost/tma
+http://localhost/admin
+http://localhost/display
+```
+
+Restart all services:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml restart
+```
+
+View logs:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
+```
+
+Run migrations manually:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
+```
+
+The `api` service also runs `prisma migrate deploy` automatically on container start.
+
+Seed deterministic demo lockers:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
+```
 
 ## Docker Compose Deployment Strategy
 
