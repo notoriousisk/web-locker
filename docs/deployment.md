@@ -121,7 +121,7 @@ infra/docker-compose.yml
 Service details:
 
 - `postgres`: `postgres:16-alpine`, persistent `postgres_data` volume, `pg_isready` health check.
-- `api`: builds `backend/api/Dockerfile`, reads `.env`, waits for healthy PostgreSQL, runs `prisma migrate deploy`, then starts `node dist/main.js` on container port `3000`.
+- `api`: builds `backend/api/Dockerfile`, reads `.env`, waits for healthy PostgreSQL, runs `prisma migrate deploy`, then starts the compiled NestJS entrypoint with `npm run start` on container port `3000`.
 - `tma`: builds `apps/tma/Dockerfile` and serves the built Vite app under `/tma/`.
 - `admin`: builds `apps/admin/Dockerfile` and serves the built Vite app under `/admin/`.
 - `display`: builds `apps/display/Dockerfile` and serves the built Vite app under `/display/`.
