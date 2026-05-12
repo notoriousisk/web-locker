@@ -6,7 +6,7 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository is currently at Stage 9: final verification, cleanup, and start instructions.
+The repository has completed Stage 9: final verification, cleanup, and start instructions. Stage 10 and Stage 11 are planned next and are documentation-only until explicitly implemented.
 
 The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, and simple start/stop helper scripts exist.
 
@@ -111,6 +111,8 @@ The MVP includes:
 - Prisma migrations and seed data.
 - Docker Compose deployment.
 - Nginx routing.
+- Planned Stage 10: full Telegram MiniApp authentication using backend-validated Telegram `initData`.
+- Planned Stage 11: simple fixed locker pricing and balance deduction.
 
 ## Forbidden MVP Features
 
@@ -135,7 +137,42 @@ Do not add these unless the user explicitly requests and approves a scope change
 - Message queues.
 - External managed services required for core MVP operation.
 
-The `User.balance` field is only a numeric database field. It is displayed in the MiniApp and may be edited manually in the database for MVP testing.
+Until Stage 11 is implemented, the `User.balance` field is only a numeric database field. It is displayed in the MiniApp and may be edited manually in the database for MVP testing. Stage 11 must keep the MVP free of real payments while adding fixed prices and balance deduction.
+
+## Planned Stage 10 Telegram MiniApp Authentication Rules
+
+Stage 10 is planned but not implemented yet.
+
+Rules for future implementation:
+
+- Replace the placeholder `telegramId` identity flow with Telegram MiniApp `initData` authentication.
+- The frontend must send the raw Telegram `initData` string to the backend.
+- The backend must validate `initData` cryptographically using the Telegram bot token before creating or updating a user.
+- The backend must not trust `initDataUnsafe` for authentication or authorization.
+- After successful validation, the backend should issue a short-lived TMA JWT containing the internal `userId` and Telegram identity.
+- TMA user, balance, session, start-session, and finish-session APIs must require that TMA JWT and derive identity from it.
+- The TMA should prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
+- The editable demo `telegramId` must be removed from production and allowed only behind an explicit local development mode.
+- Local development behavior when Telegram `initData` is unavailable must be documented.
+- Security assumptions and limitations must be documented in `README.md`, `docs/architecture.md`, `docs/deployment.md`, and `docs/implementation-plan.md`.
+
+## Planned Stage 11 Balance and Pricing Rules
+
+Stage 11 is planned but not implemented yet.
+
+Rules for future implementation:
+
+- New users must start with balance `1000`.
+- Fixed locker prices are `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
+- Price must be based on the assigned locker size, not the requested luggage size.
+- If a user requests `M` but the backend assigns an `L` locker, the cost is `10`.
+- Before starting storage, the backend must check that the user has enough balance for the assigned locker size.
+- If balance is insufficient, storage must not start and no locker should become `OCCUPIED`.
+- When finishing storage, the backend must deduct the cost based on the assigned locker size.
+- The balance deduction must happen in the same transaction as completing the storage session and releasing the locker.
+- Do not add payment providers, invoices, refunds, or transaction history unless explicitly approved later.
+- Prefer not to add new entities for Stage 11; keep fixed MVP pricing simple unless a schema change is clearly justified and documented.
+- Admin can still manually edit balance directly in the database for MVP testing.
 
 ## Locker Selection Rules
 
@@ -236,8 +273,9 @@ Rules:
 - Do not add in-memory fake sessions or fake locker assignment logic in the frontend.
 - Use `VITE_TMA_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
 - Use `VITE_TMA_BASE_PATH` for the production Vite base path, defaulting to `/tma/` in Docker.
-- Keep the current placeholder `telegramId` flow until the user explicitly approves production Telegram `initData` validation.
-- Document clearly that production Telegram `initData` validation is not implemented yet.
+- Keep the current placeholder `telegramId` flow until Stage 10 implementation is explicitly requested.
+- When Stage 10 is implemented, remove the production placeholder identity flow and authenticate through backend-validated Telegram `initData`.
+- Document clearly that production Telegram `initData` validation is planned but not implemented yet until Stage 10 is completed.
 - Do not add payments, QR codes, WebSockets, or complex state management in the TMA MVP.
 
 ## Admin Frontend Rules

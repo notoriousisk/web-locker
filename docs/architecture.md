@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository is currently at Stage 9: the NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This document describes the planned architecture and current implementation. The repository has completed Stage 9, and Stages 10 and 11 are planned next as documentation-only future work. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## System Overview
 
@@ -55,7 +55,7 @@ Current Stage 5 contents:
 - Vite dev proxy from `/api` to `http://localhost:3000`.
 - API base URL read from `VITE_TMA_API_BASE_URL`, defaulting to `/api`.
 
-For MVP, the TMA uses a placeholder Telegram identity flow. It reads `window.Telegram.WebApp.initDataUnsafe.user.id` when available and falls back to an editable demo `telegramId` outside Telegram. Production Telegram `initData` validation is not implemented yet.
+For the current completed Stage 9 MVP, the TMA uses a placeholder Telegram identity flow. It reads `window.Telegram.WebApp.initDataUnsafe.user.id` when available and falls back to an editable demo `telegramId` outside Telegram. Production Telegram `initData` validation is not implemented yet. Planned Stage 10 replaces this with backend-validated Telegram `initData` authentication.
 
 ### Admin Web Panel: `apps/admin`
 
@@ -127,6 +127,19 @@ Current backend contents:
 - Sessions module for DB-backed active/history reads, start-session flow, and finish-session flow.
 - Public module for unauthenticated locker grid data and basic stats.
 - Admin backend with env-based login, JWT guard, dashboard stats, user/session reads, locker reads, and constrained locker maintenance status updates.
+
+Planned Stage 10 backend change:
+
+- Add Telegram MiniApp auth flow that validates raw Telegram `initData` on the backend.
+- Create or update users only after successful Telegram `initData` validation.
+- Issue a short-lived TMA JWT after successful validation.
+- Use the TMA JWT identity for user and session endpoints instead of trusting client-supplied `telegramId`.
+
+Planned Stage 11 backend change:
+
+- Add fixed MVP locker prices.
+- Check user balance before occupying the assigned locker.
+- Deduct the assigned locker price when finishing a session in the same transaction that releases the locker.
 
 ### Infrastructure: `infra`
 
@@ -218,7 +231,9 @@ Fields:
 Rules:
 
 - `telegramId` must be unique.
-- `balance` is only a numeric field.
+- Until Stage 11 is implemented, `balance` is only a numeric field.
+- Stage 11 is planned to make new users start with balance `1000`.
+- Stage 11 must keep admin balance edits as direct database edits for MVP testing.
 - No payment transaction model exists in MVP.
 
 ### Locker
@@ -344,6 +359,68 @@ The finish-session operation must run in a transaction:
 
 Current implementation verifies the active session belongs to the provided `telegramId` before releasing the locker.
 
+## Planned Stage 10 Telegram Authentication
+
+Stage 10 will replace the placeholder `telegramId` flow with production-oriented Telegram MiniApp authentication.
+
+Planned flow:
+
+1. Telegram opens the TMA and provides `window.Telegram.WebApp.initData`.
+2. The frontend sends the raw `initData` string to the backend.
+3. The backend validates the Telegram signature cryptographically using the Telegram bot token.
+4. The backend rejects invalid, missing, expired, or tampered `initData` in production mode.
+5. The backend creates or updates the user profile only after validation succeeds.
+6. The backend issues a short-lived TMA JWT containing the internal `userId` and Telegram identity.
+7. The TMA sends the token as `Authorization: Bearer <token>` to user/session APIs.
+8. User, balance, active-session, history, start-session, and finish-session endpoints use the authenticated token identity instead of request-provided `telegramId`.
+
+Security notes:
+
+- `initDataUnsafe` must not be trusted for authentication or authorization because it is client-provided parsed data.
+- The raw `initData` must be validated on the backend before any user identity is accepted.
+- A Telegram bot token becomes a backend secret and must never be exposed to frontend builds.
+- The TMA JWT should be scoped to TMA user APIs and should not be accepted by admin guards.
+- The TMA should prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
+- The implementation should check Telegram `auth_date` freshness and document the accepted lifetime.
+- HTTPS is required for real Telegram MiniApp production use; this repository currently documents HTTP container routing with TLS termination expected outside the stack unless direct TLS is added later.
+
+Local development assumptions:
+
+- Local browser development often has no Telegram `initData`.
+- Stage 10 should provide an explicit local development mode for a demo identity, guarded by a clearly named non-production environment variable or development-only code path.
+- Production builds must not silently fall back to editable `telegramId`.
+
+## Planned Stage 11 Balance and Pricing
+
+Stage 11 will add simple fixed balance and pricing behavior without real payments.
+
+Pricing rules:
+
+```txt
+S  = 5
+M  = 7
+L  = 10
+XL = 15
+```
+
+Rules:
+
+- New users start with balance `1000`.
+- Price is based on the assigned locker size, not the requested luggage size.
+- Example: if a user requests `M` and the backend assigns an `L` locker, the cost is `10`.
+- Start-session must select the smallest suitable available locker, determine its price, then check the user's balance before occupying the locker.
+- If the user has insufficient balance, the transaction must not create an active session and must not mark any locker as `OCCUPIED`.
+- Finish-session must deduct the assigned locker price in the same transaction that marks the session `COMPLETED`, sets `endedAt`, and marks the locker `AVAILABLE`.
+- Admin can still manually edit `User.balance` directly in PostgreSQL for MVP testing.
+
+MVP exclusions:
+
+- No payment providers.
+- No invoices.
+- No refunds.
+- No transaction history by default.
+- No payment transaction tables unless explicitly approved later.
+
 ## Current Backend Endpoints
 
 ```txt
@@ -412,14 +489,15 @@ The frontend does not implement locker status rules locally beyond hiding invali
 ### Start Storage
 
 1. User opens Telegram MiniApp.
-2. MiniApp sends Telegram user data to backend.
-3. Backend creates or updates the user.
+2. Current Stage 9 flow sends placeholder Telegram user data to backend.
+3. Planned Stage 10 flow sends raw Telegram `initData` and creates or updates the user only after backend validation succeeds.
 4. User selects luggage size: `S`, `M`, `L`, or `XL`.
 5. Frontend sends selected size to backend.
 6. Backend finds the smallest suitable available locker.
-7. Backend creates an active storage session.
-8. Backend marks the locker as `OCCUPIED`.
-9. User sees the assigned locker code.
+7. Planned Stage 11 flow checks balance against the assigned locker size price.
+8. Backend creates an active storage session.
+9. Backend marks the locker as `OCCUPIED`.
+10. User sees the assigned locker code.
 
 ### Finish Storage
 
@@ -427,8 +505,9 @@ The frontend does not implement locker status rules locally beyond hiding invali
 2. User clicks finish or take luggage.
 3. Backend marks the session as `COMPLETED`.
 4. Backend sets `endedAt`.
-5. Backend marks the locker as `AVAILABLE`.
-6. User no longer sees the session as active.
+5. Planned Stage 11 flow deducts the assigned locker size price in the same transaction.
+6. Backend marks the locker as `AVAILABLE`.
+7. User no longer sees the session as active.
 
 ## Admin Flow
 
@@ -459,7 +538,7 @@ The MVP intentionally excludes:
 - Payment providers.
 - Invoices.
 - Refunds.
-- Transaction history.
+- Transaction history by default.
 - Physical locker integration.
 - WebSockets.
 - Complex analytics.
@@ -468,7 +547,10 @@ The MVP intentionally excludes:
 - 3D visualization.
 - Real baggage dimension input.
 - Complex admin roles.
-- Production-grade Telegram auth hardening unless explicitly requested.
-- Production Telegram `initData` validation.
+
+Updated planned limitations:
+
+- Stage 10 adds Telegram `initData` validation but does not add complex auth roles, external managed auth services, or a Telegram bot command backend.
+- Stage 11 adds balance deduction but does not add payment providers, invoices, refunds, or transaction history.
 
 These limitations keep the first version small, deployable, and testable.

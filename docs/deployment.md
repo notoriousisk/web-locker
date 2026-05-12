@@ -2,7 +2,7 @@
 
 This document describes the VPS deployment strategy for `locker-mvp`.
 
-The repository is currently at Stage 9: final verification, cleanup, and start instructions. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+The repository has completed Stage 9: final verification, cleanup, and start instructions. Stages 10 and 11 are planned next and are documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## VPS Assumptions
 
@@ -199,6 +199,25 @@ Rules:
 - `VITE_DISPLAY_API_BASE_URL` is used by the Stage 7 Vite public display build. The default routed value is `/api`.
 - `VITE_TMA_BASE_PATH`, `VITE_ADMIN_BASE_PATH`, and `VITE_DISPLAY_BASE_PATH` are used by production Vite builds so static assets resolve under `/tma/`, `/admin/`, and `/display/`.
 - `NGINX_HTTPS_PORT` is reserved for a later direct-TLS Nginx setup. The current Compose file publishes HTTP only and expects HTTPS to be terminated outside this container stack if needed.
+
+Planned Stage 10 environment impact:
+
+- Full Telegram MiniApp authentication is expected to require a backend-only Telegram bot token variable such as `TELEGRAM_BOT_TOKEN`.
+- The bot token must be stored only in `.env` and passed to the API container; it must not be exposed through any `VITE_` frontend variable.
+- When Stage 10 is implemented, add the variable to `.env.example`, `README.md`, and this file in the same change.
+- Production Telegram MiniApp use requires HTTPS. The current Compose stack publishes HTTP and assumes TLS termination happens outside the stack unless direct TLS support is explicitly added and documented later.
+
+Planned Stage 10 local development behavior:
+
+- Local browser development may not have Telegram `initData`.
+- Stage 10 should document and implement an explicit development-only fallback for a demo identity.
+- Production deployments must reject missing or invalid Telegram `initData`; they must not silently use an editable demo `telegramId`.
+
+Planned Stage 11 deployment impact:
+
+- Simple fixed pricing and balance deduction are planned as backend business logic.
+- No new deployment infrastructure is planned.
+- No payment provider credentials, invoice services, queues, or external managed services should be introduced for Stage 11.
 
 ## Telegram MiniApp Build Notes
 
