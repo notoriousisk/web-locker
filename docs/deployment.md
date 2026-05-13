@@ -2,7 +2,7 @@
 
 This document describes the VPS deployment strategy for `locker-mvp`.
 
-The repository has completed Stage 9: final verification, cleanup, and start instructions. Stages 10 and 11 are planned next and are documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+The repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next and is documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## VPS Assumptions
 
@@ -28,7 +28,7 @@ Create an environment file:
 cp .env.example .env
 ```
 
-Before production use, edit `.env` and replace placeholder secrets, especially `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
+Before production use, edit `.env` and replace placeholder secrets, especially `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `JWT_SECRET`, `TELEGRAM_BOT_TOKEN`, and `TMA_JWT_SECRET`.
 
 Start the full stack with attached logs:
 
@@ -172,6 +172,16 @@ ADMIN_LOGIN=admin
 ADMIN_PASSWORD=change-me
 JWT_SECRET=change-me
 
+TELEGRAM_BOT_TOKEN=replace-with-botfather-token
+TMA_JWT_SECRET=change-me-tma-secret
+TMA_JWT_EXPIRES_IN=15m
+TMA_INIT_DATA_MAX_AGE_SECONDS=86400
+TMA_DEV_AUTH_ENABLED=false
+TMA_DEV_TELEGRAM_ID=1001
+TMA_DEV_USERNAME=demo
+TMA_DEV_FIRST_NAME=Demo
+TMA_DEV_LAST_NAME=User
+
 TMA_PUBLIC_API_BASE_URL=/api
 VITE_TMA_API_BASE_URL=/api
 VITE_TMA_BASE_PATH=/tma/
@@ -193,6 +203,11 @@ Rules:
 - `.env.example` must contain placeholders only.
 - Any new variable must be documented in `.env.example`, `README.md`, and this file.
 - `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` are required for Stage 4 admin login and protected admin endpoints.
+- `TELEGRAM_BOT_TOKEN` is required for production Stage 10 Telegram MiniApp `initData` validation and must remain backend-only.
+- `TMA_JWT_SECRET` signs TMA-only JWTs and must be different from or at least independently rotated from `JWT_SECRET`.
+- `TMA_JWT_EXPIRES_IN` controls the short-lived TMA JWT lifetime and defaults to `15m` if omitted.
+- `TMA_INIT_DATA_MAX_AGE_SECONDS` controls stale Telegram `auth_date` rejection and defaults to `86400` seconds if omitted.
+- `TMA_DEV_AUTH_ENABLED=true` allows local browser development without Telegram `initData` by using `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`. Keep it `false` in production.
 - `API_PORT` is fixed to `3000` inside Docker Compose so Nginx can route to the API service. Change `NGINX_HTTP_PORT` to alter the host-facing HTTP port.
 - `VITE_TMA_API_BASE_URL` is used by the Stage 5 Vite TMA build. The default routed value is `/api`.
 - `VITE_ADMIN_API_BASE_URL` is used by the Stage 6 Vite admin build. The default routed value is `/api`.
@@ -200,18 +215,14 @@ Rules:
 - `VITE_TMA_BASE_PATH`, `VITE_ADMIN_BASE_PATH`, and `VITE_DISPLAY_BASE_PATH` are used by production Vite builds so static assets resolve under `/tma/`, `/admin/`, and `/display/`.
 - `NGINX_HTTPS_PORT` is reserved for a later direct-TLS Nginx setup. The current Compose file publishes HTTP only and expects HTTPS to be terminated outside this container stack if needed.
 
-Planned Stage 10 environment impact:
+Stage 10 Telegram MiniApp auth behavior:
 
-- Full Telegram MiniApp authentication is expected to require a backend-only Telegram bot token variable such as `TELEGRAM_BOT_TOKEN`.
-- The bot token must be stored only in `.env` and passed to the API container; it must not be exposed through any `VITE_` frontend variable.
-- When Stage 10 is implemented, add the variable to `.env.example`, `README.md`, and this file in the same change.
+- The frontend sends raw `window.Telegram.WebApp.initData` to `POST /api/tma/auth/login`.
+- The API validates the Telegram signature using `TELEGRAM_BOT_TOKEN`, checks `auth_date`, creates or updates the user, and returns a TMA JWT signed with `TMA_JWT_SECRET`.
+- User/session TMA routes require `Authorization: Bearer <tma-token>` and derive identity from the token.
+- Production deployments reject missing, invalid, tampered, or stale `initData`.
+- Local browser development may not have Telegram `initData`; use `TMA_DEV_AUTH_ENABLED=true` only in local development.
 - Production Telegram MiniApp use requires HTTPS. The current Compose stack publishes HTTP and assumes TLS termination happens outside the stack unless direct TLS support is explicitly added and documented later.
-
-Planned Stage 10 local development behavior:
-
-- Local browser development may not have Telegram `initData`.
-- Stage 10 should document and implement an explicit development-only fallback for a demo identity.
-- Production deployments must reject missing or invalid Telegram `initData`; they must not silently use an editable demo `telegramId`.
 
 Planned Stage 11 deployment impact:
 

@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository has completed Stage 9: final verification, cleanup, and start instructions. Stage 10 and Stage 11 are planned next and are documentation-only until explicitly implemented.
+The repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next and is documentation-only until explicitly implemented.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, and simple start/stop helper scripts exist.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, TMA auth module, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, and simple start/stop helper scripts exist.
 
 ## Mandatory Files to Read Before Editing
 
@@ -111,7 +111,7 @@ The MVP includes:
 - Prisma migrations and seed data.
 - Docker Compose deployment.
 - Nginx routing.
-- Planned Stage 10: full Telegram MiniApp authentication using backend-validated Telegram `initData`.
+- Full Telegram MiniApp authentication using backend-validated Telegram `initData`.
 - Planned Stage 11: simple fixed locker pricing and balance deduction.
 
 ## Forbidden MVP Features
@@ -139,22 +139,24 @@ Do not add these unless the user explicitly requests and approves a scope change
 
 Until Stage 11 is implemented, the `User.balance` field is only a numeric database field. It is displayed in the MiniApp and may be edited manually in the database for MVP testing. Stage 11 must keep the MVP free of real payments while adding fixed prices and balance deduction.
 
-## Planned Stage 10 Telegram MiniApp Authentication Rules
+## Stage 10 Telegram MiniApp Authentication Rules
 
-Stage 10 is planned but not implemented yet.
+Stage 10 is implemented.
 
-Rules for future implementation:
+Rules for future changes:
 
-- Replace the placeholder `telegramId` identity flow with Telegram MiniApp `initData` authentication.
 - The frontend must send the raw Telegram `initData` string to the backend.
 - The backend must validate `initData` cryptographically using the Telegram bot token before creating or updating a user.
 - The backend must not trust `initDataUnsafe` for authentication or authorization.
-- After successful validation, the backend should issue a short-lived TMA JWT containing the internal `userId` and Telegram identity.
+- After successful validation, the backend issues a short-lived TMA JWT containing the internal `userId`, Telegram identity, and a TMA scope.
 - TMA user, balance, session, start-session, and finish-session APIs must require that TMA JWT and derive identity from it.
-- The TMA should prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
-- The editable demo `telegramId` must be removed from production and allowed only behind an explicit local development mode.
+- The TMA must prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
+- The editable demo `telegramId` is removed from production; local demo authentication is allowed only through explicit backend `TMA_DEV_AUTH_ENABLED=true`.
 - Local development behavior when Telegram `initData` is unavailable must be documented.
 - Security assumptions and limitations must be documented in `README.md`, `docs/architecture.md`, `docs/deployment.md`, and `docs/implementation-plan.md`.
+- Keep `TELEGRAM_BOT_TOKEN` backend-only and never expose it through frontend `VITE_` variables.
+- Keep admin JWTs and TMA JWTs separated by secret and token scope.
+- Stage 10 environment variables are `TELEGRAM_BOT_TOKEN`, `TMA_JWT_SECRET`, `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, `TMA_DEV_AUTH_ENABLED`, `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`.
 
 ## Planned Stage 11 Balance and Pricing Rules
 
@@ -246,6 +248,7 @@ Rules:
 - Do not hardcode production secrets.
 - Do not assume production secrets.
 - Use `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` for MVP admin authentication.
+- Use `TELEGRAM_BOT_TOKEN`, `TMA_JWT_SECRET`, `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, `TMA_DEV_AUTH_ENABLED`, `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME` for Stage 10 TMA authentication.
 - Use `DATABASE_URL` for Prisma.
 - Document every new required variable in `README.md` and `docs/deployment.md`.
 
@@ -273,9 +276,9 @@ Rules:
 - Do not add in-memory fake sessions or fake locker assignment logic in the frontend.
 - Use `VITE_TMA_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
 - Use `VITE_TMA_BASE_PATH` for the production Vite base path, defaulting to `/tma/` in Docker.
-- Keep the current placeholder `telegramId` flow until Stage 10 implementation is explicitly requested.
-- When Stage 10 is implemented, remove the production placeholder identity flow and authenticate through backend-validated Telegram `initData`.
-- Document clearly that production Telegram `initData` validation is planned but not implemented yet until Stage 10 is completed.
+- Authenticate through backend-validated Telegram `initData`.
+- Do not restore the production placeholder `telegramId` flow.
+- Local browser development without Telegram `initData` must rely on explicit backend `TMA_DEV_AUTH_ENABLED=true` with `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`, not editable production identity fields.
 - Do not add payments, QR codes, WebSockets, or complex state management in the TMA MVP.
 
 ## Admin Frontend Rules

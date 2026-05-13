@@ -5,10 +5,10 @@ import {
   getActiveSessions,
   getHistorySessions,
   getUser,
+  loginWithTelegram,
   startSession,
-  upsertUser
 } from './api';
-import { getInitialUser, initializeTelegramApp } from './telegram';
+import { getTelegramInitData, initializeTelegramApp } from './telegram';
 import { LockerSize, StorageSession, User } from './types';
 
 type Tab = 'home' | 'active' | 'history';
@@ -16,8 +16,8 @@ type Tab = 'home' | 'active' | 'history';
 const lockerSizes: LockerSize[] = ['S', 'M', 'L', 'XL'];
 
 export function App() {
-  const initialUser = useMemo(() => getInitialUser(), []);
-  const [telegramId, setTelegramId] = useState(initialUser.telegramId);
+  const initData = useMemo(() => getTelegramInitData(), []);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
   const [activeSessions, setActiveSessions] = useState<StorageSession[]>([]);
   const [historySessions, setHistorySessions] = useState<StorageSession[]>([]);
@@ -37,28 +37,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    void loadUserData();
+    void authenticateAndLoad();
   }, []);
 
-  async function loadUserData(nextTelegramId = telegramId) {
+  async function authenticateAndLoad() {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      const upsertedUser = await upsertUser({
-        ...initialUser,
-        telegramId: nextTelegramId
-      });
-      const [freshUser, active, history] = await Promise.all([
-        getUser(upsertedUser.telegramId),
-        getActiveSessions(upsertedUser.telegramId),
-        getHistorySessions(upsertedUser.telegramId)
-      ]);
-
-      setProfile(freshUser);
-      setActiveSessions(active);
-      setHistorySessions(history);
-      setTelegramId(freshUser.telegramId);
+      const login = await loginWithTelegram(initData);
+      setAccessToken(login.accessToken);
+      await loadUserData(login.accessToken, login.user);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -66,18 +55,45 @@ export function App() {
     }
   }
 
-  async function handleLoadProfile() {
-    await loadUserData(telegramId);
+  async function loadUserData(token = accessToken, knownUser?: User) {
+    if (!token) {
+      await authenticateAndLoad();
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const [freshUser, active, history] = await Promise.all([
+        knownUser ? Promise.resolve(knownUser) : getUser(token),
+        getActiveSessions(token),
+        getHistorySessions(token)
+      ]);
+
+      setProfile(freshUser);
+      setActiveSessions(active);
+      setHistorySessions(history);
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function handleStartSession() {
+    if (!accessToken) {
+      await authenticateAndLoad();
+      return;
+    }
+
     setIsStarting(true);
     setErrorMessage(null);
 
     try {
-      const session = await startSession(telegramId, selectedSize);
+      const session = await startSession(accessToken, selectedSize);
       setLastAssignedSession(session);
-      await loadUserData(telegramId);
+      await loadUserData(accessToken);
       setActiveTab('active');
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
@@ -87,15 +103,20 @@ export function App() {
   }
 
   async function handleFinishSession(sessionId: string) {
+    if (!accessToken) {
+      await authenticateAndLoad();
+      return;
+    }
+
     setFinishingSessionId(sessionId);
     setErrorMessage(null);
 
     try {
-      await finishSession(sessionId, telegramId);
+      await finishSession(sessionId, accessToken);
       if (lastAssignedSession?.id === sessionId) {
         setLastAssignedSession(null);
       }
-      await loadUserData(telegramId);
+      await loadUserData(accessToken);
     } catch (error) {
       setErrorMessage(getErrorMessage(error));
     } finally {
@@ -123,17 +144,9 @@ export function App() {
       </section>
 
       <section className="profile-panel">
-        <label htmlFor="telegramId">Telegram ID</label>
-        <div className="identity-row">
-          <input
-            id="telegramId"
-            value={telegramId}
-            onChange={(event) => setTelegramId(event.target.value)}
-            inputMode="numeric"
-          />
-          <button type="button" onClick={() => void handleLoadProfile()}>
-            Load
-          </button>
+        <div className="auth-status">
+          <span>Telegram auth</span>
+          <strong>{accessToken ? 'Connected' : 'Pending'}</strong>
         </div>
         <div className="profile-grid">
           <Metric label="User" value={formatUserName(profile)} />

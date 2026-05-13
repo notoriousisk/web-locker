@@ -47,6 +47,7 @@ export type TelegramUnsafeUser = {
 export type TelegramWebApp = {
   ready?: () => void;
   expand?: () => void;
+  initData?: string;
   initDataUnsafe?: {
     user?: TelegramUnsafeUser;
   };

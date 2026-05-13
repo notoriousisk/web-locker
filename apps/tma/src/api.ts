@@ -4,12 +4,14 @@ const apiBaseUrl = import.meta.env.VITE_TMA_API_BASE_URL ?? '/api';
 
 async function apiRequest<T>(
   path: string,
+  accessToken?: string,
   options: RequestInit = {}
 ): Promise<T> {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers
     }
   });
@@ -37,51 +39,48 @@ async function readErrorMessage(response: Response) {
   }
 }
 
-export type UpsertUserPayload = {
-  telegramId: string;
-  username?: string;
-  firstName?: string;
-  lastName?: string;
+export type TmaLoginResponse = {
+  accessToken: string;
+  tokenType: 'Bearer';
+  expiresIn: string;
+  user: User;
 };
 
-export function upsertUser(payload: UpsertUserPayload) {
-  return apiRequest<User>('/tma/users/upsert', {
+export function loginWithTelegram(initData: string) {
+  return apiRequest<TmaLoginResponse>('/tma/auth/login', undefined, {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ initData })
   });
 }
 
-export function getUser(telegramId: string) {
-  return apiRequest<User>(`/tma/me?telegramId=${encodeURIComponent(telegramId)}`);
+export function getUser(accessToken: string) {
+  return apiRequest<User>('/tma/me', accessToken);
 }
 
-export function getActiveSessions(telegramId: string) {
-  return apiRequest<StorageSession[]>(
-    `/tma/me/sessions/active?telegramId=${encodeURIComponent(telegramId)}`
-  );
+export function getActiveSessions(accessToken: string) {
+  return apiRequest<StorageSession[]>('/tma/me/sessions/active', accessToken);
 }
 
-export function getHistorySessions(telegramId: string) {
-  return apiRequest<StorageSession[]>(
-    `/tma/me/sessions/history?telegramId=${encodeURIComponent(telegramId)}`
-  );
+export function getHistorySessions(accessToken: string) {
+  return apiRequest<StorageSession[]>('/tma/me/sessions/history', accessToken);
 }
 
-export function startSession(telegramId: string, requestedSize: LockerSize) {
-  return apiRequest<StorageSession>('/tma/sessions', {
+export function startSession(accessToken: string, requestedSize: LockerSize) {
+  return apiRequest<StorageSession>('/tma/sessions', accessToken, {
     method: 'POST',
     body: JSON.stringify({
-      telegramId,
       requestedSize
     })
   });
 }
 
-export function finishSession(sessionId: string, telegramId: string) {
-  return apiRequest<StorageSession>(`/tma/sessions/${sessionId}/finish`, {
-    method: 'POST',
-    body: JSON.stringify({
-      telegramId
-    })
-  });
+export function finishSession(sessionId: string, accessToken: string) {
+  return apiRequest<StorageSession>(
+    `/tma/sessions/${sessionId}/finish`,
+    accessToken,
+    {
+      method: 'POST',
+      body: JSON.stringify({})
+    }
+  );
 }

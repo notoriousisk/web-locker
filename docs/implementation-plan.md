@@ -215,10 +215,10 @@ Base path should be routed through Nginx as `/api`.
 
 ### TMA/User Endpoints
 
-Current Stage 9 endpoints use the placeholder `telegramId` flow. Planned Stage 10 will replace client-supplied `telegramId` authentication with backend-validated Telegram `initData` and a short-lived TMA JWT.
+Current Stage 10 endpoints use backend-validated Telegram `initData` and a short-lived TMA JWT. TMA user/session endpoints derive identity from the TMA JWT.
 
 ```txt
-POST   /api/tma/users/upsert
+POST   /api/tma/auth/login
 GET    /api/tma/me
 GET    /api/tma/me/sessions/active
 GET    /api/tma/me/sessions/history
@@ -527,7 +527,7 @@ Stage 5 result:
 - TMA integrates with the Stage 3 backend user/session endpoints.
 - Vite dev proxy routes `/api` to `http://localhost:3000` for local development.
 - `VITE_TMA_API_BASE_URL` added for frontend API base URL configuration.
-- MVP placeholder `telegramId` flow is documented; production Telegram `initData` validation is not implemented yet.
+- The original Stage 5 build used a placeholder `telegramId` flow; Stage 10 later replaced it with backend-validated Telegram `initData`.
 - Frontend build passed.
 
 ### Stage 6: Admin Frontend
@@ -696,22 +696,33 @@ Acceptance criteria:
 Security notes:
 
 - The Telegram bot token is a backend secret and must never be included in frontend code or `VITE_` variables.
-- Stage 10 is expected to add a backend environment variable such as `TELEGRAM_BOT_TOKEN`; when implemented, it must be added to `.env.example`, `README.md`, and `docs/deployment.md`.
+- Stage 10 uses backend-only `TELEGRAM_BOT_TOKEN` for Telegram validation and `TMA_JWT_SECRET` for TMA JWT signing.
+- Stage 10 environment variables are `TELEGRAM_BOT_TOKEN`, `TMA_JWT_SECRET`, `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, `TMA_DEV_AUTH_ENABLED`, `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`.
 - `initDataUnsafe` may be used only as a display convenience after authentication, not as proof of identity.
-- The TMA should prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
-- The backend should check Telegram `auth_date` freshness and document the accepted age.
+- The TMA keeps the token in memory and re-authenticates from Telegram `initData` on app load.
+- The backend checks Telegram `auth_date` freshness with `TMA_INIT_DATA_MAX_AGE_SECONDS`, defaulting to 86400 seconds.
 - HTTPS is required for real Telegram MiniApp production use. The current Docker Compose stack serves HTTP and assumes TLS termination outside the stack unless direct TLS is added later.
 - Stage 10 does not add advanced roles, external managed auth services, or a Telegram bot command backend.
 
 Local development assumptions:
 
 - Running the TMA in a normal browser will usually not provide Telegram `initData`.
-- A local demo identity may exist only behind a clearly named development mode and must not be enabled silently in production.
+- A local demo identity exists only behind `TMA_DEV_AUTH_ENABLED=true` with `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`, and must not be enabled in production.
 - Local development behavior must be visible in documentation and obvious in configuration.
 
 Current status:
 
-- Planned.
+- Completed.
+
+Stage 10 result:
+
+- TMA auth module added to validate raw Telegram `initData` using `TELEGRAM_BOT_TOKEN`.
+- Backend rejects missing, invalid, stale, or tampered production `initData`.
+- User creation/update moved behind validated Telegram auth or explicit local `TMA_DEV_AUTH_ENABLED=true`.
+- TMA JWTs are signed with `TMA_JWT_SECRET`, short-lived by `TMA_JWT_EXPIRES_IN`, and scoped with `scope: "tma"` so admin guards do not accept them.
+- TMA user, active-session, history, start-session, and finish-session endpoints require `Authorization: Bearer <tma-token>` and derive identity from internal `userId`.
+- TMA frontend sends raw `window.Telegram.WebApp.initData`, keeps the returned token in React memory, and no longer exposes editable production `telegramId`.
+- `.env.example`, `README.md`, `AGENTS.md`, `docs/architecture.md`, `docs/deployment.md`, and this implementation plan were updated.
 
 ### Stage 11: Simple Balance and Locker Pricing
 
@@ -771,7 +782,7 @@ Current status:
 
 - One locker location only.
 - One PostgreSQL database.
-- Stage 10 will require Telegram MiniApp `initData` validation but does not require a broader Telegram bot command backend.
+- Stage 10 includes Telegram MiniApp `initData` validation but does not require a broader Telegram bot command backend.
 - Until Stage 11 is implemented, balance is manually edited in the database.
 - After Stage 11, admin balance test adjustments still happen through direct database edits.
 - Admin authentication is simple login/password from environment variables.
@@ -802,7 +813,7 @@ Do not build these in MVP:
 - Message queues.
 - External managed services required for core MVP operation.
 
-Updated planned boundaries:
+Updated boundaries:
 
 - Stage 10 includes backend validation of Telegram MiniApp `initData`, but does not add complex auth roles, managed identity services, or Telegram bot command workflows.
 - Stage 11 includes simple balance and fixed locker pricing, but does not add real payments, invoices, refunds, or payment transaction history.

@@ -15,7 +15,6 @@ import {
   requireNonEmptyString
 } from '../common/validation';
 import { PrismaService } from '../prisma/prisma.service';
-import { FinishSessionDto } from './dto/finish-session.dto';
 import { StartSessionDto } from './dto/start-session.dto';
 
 const suitableSizesByRequest: Record<LockerSize, PrismaLockerSize[]> = {
@@ -43,13 +42,13 @@ const sessionInclude = {
 export class SessionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  startSession(dto: StartSessionDto) {
-    const telegramId = requireNonEmptyString(dto.telegramId, 'telegramId');
+  startSession(userIdValue: unknown, dto: StartSessionDto) {
+    const userId = requireNonEmptyString(userIdValue, 'userId');
     const requestedSize = parseLockerSize(dto.requestedSize);
 
     return this.prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
-        where: { telegramId }
+        where: { id: userId }
       });
 
       if (!user) {
@@ -104,18 +103,16 @@ export class SessionsService {
     });
   }
 
-  finishSession(sessionIdValue: unknown, dto: FinishSessionDto) {
+  finishSession(userIdValue: unknown, sessionIdValue: unknown) {
+    const userId = requireNonEmptyString(userIdValue, 'userId');
     const sessionId = requireNonEmptyString(sessionIdValue, 'sessionId');
-    const telegramId = requireNonEmptyString(dto.telegramId, 'telegramId');
 
     return this.prisma.$transaction(async (tx) => {
       const session = await tx.storageSession.findFirst({
         where: {
           id: sessionId,
           status: PrismaSessionStatus.ACTIVE,
-          user: {
-            telegramId
-          }
+          userId
         },
         include: {
           locker: true
@@ -142,27 +139,27 @@ export class SessionsService {
     });
   }
 
-  listUserActiveSessions(telegramIdValue: unknown) {
+  listUserActiveSessions(userIdValue: unknown) {
     return this.listUserSessionsByStatus(
-      telegramIdValue,
+      userIdValue,
       PrismaSessionStatus.ACTIVE
     );
   }
 
-  listUserHistorySessions(telegramIdValue: unknown) {
+  listUserHistorySessions(userIdValue: unknown) {
     return this.listUserSessionsByStatus(
-      telegramIdValue,
+      userIdValue,
       PrismaSessionStatus.COMPLETED
     );
   }
 
   private async listUserSessionsByStatus(
-    telegramIdValue: unknown,
+    userIdValue: unknown,
     status: PrismaSessionStatus
   ) {
-    const telegramId = requireNonEmptyString(telegramIdValue, 'telegramId');
+    const userId = requireNonEmptyString(userIdValue, 'userId');
     const user = await this.prisma.user.findUnique({
-      where: { telegramId }
+      where: { id: userId }
     });
 
     if (!user) {

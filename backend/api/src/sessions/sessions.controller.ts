@@ -1,32 +1,34 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { FinishSessionDto } from './dto/finish-session.dto';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { TmaAuthGuard } from '../tma-auth/tma-auth.guard';
+import { TmaRequest } from '../tma-auth/tma-auth.types';
 import { SessionsService } from './sessions.service';
 import { StartSessionDto } from './dto/start-session.dto';
 
 @Controller('tma')
+@UseGuards(TmaAuthGuard)
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
 
   @Get('me/sessions/active')
-  listActiveSessions(@Query('telegramId') telegramId: string | undefined) {
-    return this.sessionsService.listUserActiveSessions(telegramId);
+  listActiveSessions(@Req() request: TmaRequest) {
+    return this.sessionsService.listUserActiveSessions(request.tmaUser?.userId);
   }
 
   @Get('me/sessions/history')
-  listHistorySessions(@Query('telegramId') telegramId: string | undefined) {
-    return this.sessionsService.listUserHistorySessions(telegramId);
+  listHistorySessions(@Req() request: TmaRequest) {
+    return this.sessionsService.listUserHistorySessions(request.tmaUser?.userId);
   }
 
   @Post('sessions')
-  startSession(@Body() dto: StartSessionDto) {
-    return this.sessionsService.startSession(dto);
+  startSession(@Req() request: TmaRequest, @Body() dto: StartSessionDto) {
+    return this.sessionsService.startSession(request.tmaUser?.userId, dto);
   }
 
   @Post('sessions/:id/finish')
   finishSession(
-    @Param('id') sessionId: string,
-    @Body() dto: FinishSessionDto
+    @Req() request: TmaRequest,
+    @Param('id') sessionId: string
   ) {
-    return this.sessionsService.finishSession(sessionId, dto);
+    return this.sessionsService.finishSession(request.tmaUser?.userId, sessionId);
   }
 }

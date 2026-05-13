@@ -1,18 +1,15 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { UpsertUserDto } from './dto/upsert-user.dto';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { TmaAuthGuard } from '../tma-auth/tma-auth.guard';
+import { TmaRequest } from '../tma-auth/tma-auth.types';
 import { UsersService } from './users.service';
 
 @Controller('tma')
+@UseGuards(TmaAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post('users/upsert')
-  upsertTelegramUser(@Body() dto: UpsertUserDto) {
-    return this.usersService.upsertTelegramUser(dto);
-  }
-
   @Get('me')
-  getMe(@Query('telegramId') telegramId: string | undefined) {
-    return this.usersService.getByTelegramId(telegramId);
+  getMe(@Req() request: TmaRequest) {
+    return this.usersService.getById(request.tmaUser?.userId);
   }
 }

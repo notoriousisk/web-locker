@@ -1,3 +1,1 @@
-export type FinishSessionDto = {
-  telegramId?: unknown;
-};
+export type FinishSessionDto = Record<string, never>;

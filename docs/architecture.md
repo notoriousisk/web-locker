@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository has completed Stage 9, and Stages 10 and 11 are planned next as documentation-only future work. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This document describes the planned architecture and current implementation. The repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next as documentation-only future work. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## System Overview
 
@@ -19,6 +19,7 @@ The backend API owns business logic:
 
 - User profile persistence.
 - Balance reads.
+- Telegram MiniApp `initData` validation and TMA JWT authentication.
 - Locker assignment.
 - Storage session lifecycle.
 - Admin authentication.
@@ -55,7 +56,14 @@ Current Stage 5 contents:
 - Vite dev proxy from `/api` to `http://localhost:3000`.
 - API base URL read from `VITE_TMA_API_BASE_URL`, defaulting to `/api`.
 
-For the current completed Stage 9 MVP, the TMA uses a placeholder Telegram identity flow. It reads `window.Telegram.WebApp.initDataUnsafe.user.id` when available and falls back to an editable demo `telegramId` outside Telegram. Production Telegram `initData` validation is not implemented yet. Planned Stage 10 replaces this with backend-validated Telegram `initData` authentication.
+Current Stage 10 contents:
+
+- Reads raw `window.Telegram.WebApp.initData` when opened inside Telegram.
+- Sends raw `initData` to the backend for validation.
+- Stores the returned short-lived TMA JWT in React memory only.
+- Sends `Authorization: Bearer <tma-token>` to user and session endpoints.
+- No editable production `telegramId` flow.
+- Local browser development without Telegram `initData` is available only through explicit backend `TMA_DEV_AUTH_ENABLED=true`.
 
 ### Admin Web Panel: `apps/admin`
 
@@ -122,18 +130,13 @@ Current backend contents:
 - Global `PrismaModule` and `PrismaService`.
 - Shared TypeScript enums for locker size, locker status, and session status.
 - Prisma schema, initial migration, and deterministic seed script.
-- Users module for Telegram user placeholder upsert and profile reads.
+- TMA auth module for backend validation of raw Telegram `initData`, user upsert, and short-lived TMA JWT issuing.
+- Users module for authenticated TMA profile reads.
 - Lockers module for DB-backed locker listing.
 - Sessions module for DB-backed active/history reads, start-session flow, and finish-session flow.
 - Public module for unauthenticated locker grid data and basic stats.
 - Admin backend with env-based login, JWT guard, dashboard stats, user/session reads, locker reads, and constrained locker maintenance status updates.
-
-Planned Stage 10 backend change:
-
-- Add Telegram MiniApp auth flow that validates raw Telegram `initData` on the backend.
-- Create or update users only after successful Telegram `initData` validation.
-- Issue a short-lived TMA JWT after successful validation.
-- Use the TMA JWT identity for user and session endpoints instead of trusting client-supplied `telegramId`.
+- TMA user/session endpoints use the TMA JWT identity instead of trusting client-supplied `telegramId`.
 
 Planned Stage 11 backend change:
 
@@ -357,13 +360,13 @@ The finish-session operation must run in a transaction:
 2. Set `endedAt`.
 3. Mark the locker as `AVAILABLE`.
 
-Current implementation verifies the active session belongs to the provided `telegramId` before releasing the locker.
+Current implementation verifies the active session belongs to the authenticated internal `userId` from the TMA JWT before releasing the locker.
 
-## Planned Stage 10 Telegram Authentication
+## Stage 10 Telegram Authentication
 
-Stage 10 will replace the placeholder `telegramId` flow with production-oriented Telegram MiniApp authentication.
+Stage 10 replaces the placeholder `telegramId` flow with production-oriented Telegram MiniApp authentication.
 
-Planned flow:
+Implemented flow:
 
 1. Telegram opens the TMA and provides `window.Telegram.WebApp.initData`.
 2. The frontend sends the raw `initData` string to the backend.
@@ -380,15 +383,27 @@ Security notes:
 - The raw `initData` must be validated on the backend before any user identity is accepted.
 - A Telegram bot token becomes a backend secret and must never be exposed to frontend builds.
 - The TMA JWT should be scoped to TMA user APIs and should not be accepted by admin guards.
-- The TMA should prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
-- The implementation should check Telegram `auth_date` freshness and document the accepted lifetime.
+- The TMA stores the token in memory and re-authenticates from Telegram `initData` on app load.
+- The implementation checks Telegram `auth_date` freshness with `TMA_INIT_DATA_MAX_AGE_SECONDS`, defaulting to 86400 seconds.
 - HTTPS is required for real Telegram MiniApp production use; this repository currently documents HTTP container routing with TLS termination expected outside the stack unless direct TLS is added later.
 
 Local development assumptions:
 
 - Local browser development often has no Telegram `initData`.
-- Stage 10 should provide an explicit local development mode for a demo identity, guarded by a clearly named non-production environment variable or development-only code path.
-- Production builds must not silently fall back to editable `telegramId`.
+- Stage 10 provides explicit local development mode through backend `TMA_DEV_AUTH_ENABLED=true` and identity variables `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`.
+- Production builds do not silently fall back to editable `telegramId`.
+
+Stage 10 environment variables:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TMA_JWT_SECRET`
+- `TMA_JWT_EXPIRES_IN`
+- `TMA_INIT_DATA_MAX_AGE_SECONDS`
+- `TMA_DEV_AUTH_ENABLED`
+- `TMA_DEV_TELEGRAM_ID`
+- `TMA_DEV_USERNAME`
+- `TMA_DEV_FIRST_NAME`
+- `TMA_DEV_LAST_NAME`
 
 ## Planned Stage 11 Balance and Pricing
 
@@ -426,10 +441,10 @@ MVP exclusions:
 ```txt
 GET  /api/health
 
-POST /api/tma/users/upsert
-GET  /api/tma/me?telegramId=<telegram-id>
-GET  /api/tma/me/sessions/active?telegramId=<telegram-id>
-GET  /api/tma/me/sessions/history?telegramId=<telegram-id>
+POST /api/tma/auth/login
+GET  /api/tma/me
+GET  /api/tma/me/sessions/active
+GET  /api/tma/me/sessions/history
 POST /api/tma/sessions
 POST /api/tma/sessions/:id/finish
 
@@ -449,22 +464,22 @@ GET  /api/admin/sessions/active
 GET  /api/admin/sessions/history
 ```
 
-All Stage 3 and Stage 4 business endpoints use `PrismaService` and the real PostgreSQL database. No in-memory storage or mock repositories are used.
+All TMA, Stage 3, and Stage 4 business endpoints use `PrismaService` and the real PostgreSQL database. No in-memory storage or mock repositories are used.
 
 ## Current TMA Backend Integration
 
-The Stage 5 TMA calls these backend endpoints:
+The Stage 10 TMA calls these backend endpoints:
 
 ```txt
-POST /api/tma/users/upsert
-GET  /api/tma/me?telegramId=<telegram-id>
-GET  /api/tma/me/sessions/active?telegramId=<telegram-id>
-GET  /api/tma/me/sessions/history?telegramId=<telegram-id>
+POST /api/tma/auth/login
+GET  /api/tma/me
+GET  /api/tma/me/sessions/active
+GET  /api/tma/me/sessions/history
 POST /api/tma/sessions
 POST /api/tma/sessions/:id/finish
 ```
 
-The frontend does not implement locker assignment locally. It sends the requested luggage size to the backend and displays the assigned locker returned by the API.
+After login, the frontend sends the TMA JWT as `Authorization: Bearer <tma-token>`. It does not implement locker assignment locally. It sends the requested luggage size to the backend and displays the assigned locker returned by the API.
 
 ## Current Admin Frontend Integration
 
@@ -489,10 +504,10 @@ The frontend does not implement locker status rules locally beyond hiding invali
 ### Start Storage
 
 1. User opens Telegram MiniApp.
-2. Current Stage 9 flow sends placeholder Telegram user data to backend.
-3. Planned Stage 10 flow sends raw Telegram `initData` and creates or updates the user only after backend validation succeeds.
+2. Stage 10 flow sends raw Telegram `initData` and creates or updates the user only after backend validation succeeds.
+3. Backend returns a short-lived TMA JWT for user/session APIs.
 4. User selects luggage size: `S`, `M`, `L`, or `XL`.
-5. Frontend sends selected size to backend.
+5. Frontend sends selected size to backend with the TMA JWT.
 6. Backend finds the smallest suitable available locker.
 7. Planned Stage 11 flow checks balance against the assigned locker size price.
 8. Backend creates an active storage session.

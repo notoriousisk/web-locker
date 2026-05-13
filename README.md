@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository has completed Stage 9: final verification, cleanup, and start instructions. Stages 10 and 11 are planned next and are documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next and is documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## MVP Scope
 
@@ -16,7 +16,7 @@ The MVP will include:
 - Prisma schema, migrations, and seed data.
 - Docker Compose deployment.
 - Nginx routing.
-- Planned Stage 10 production Telegram MiniApp `initData` authentication.
+- Backend-validated Telegram MiniApp `initData` authentication.
 - Planned Stage 11 simple fixed locker pricing and balance deduction.
 - Mandatory documentation.
 
@@ -123,10 +123,10 @@ GET /api/health
 Current backend API endpoints:
 
 ```txt
-POST /api/tma/users/upsert
-GET  /api/tma/me?telegramId=<telegram-id>
-GET  /api/tma/me/sessions/active?telegramId=<telegram-id>
-GET  /api/tma/me/sessions/history?telegramId=<telegram-id>
+POST /api/tma/auth/login
+GET  /api/tma/me
+GET  /api/tma/me/sessions/active
+GET  /api/tma/me/sessions/history
 POST /api/tma/sessions
 POST /api/tma/sessions/:id/finish
 
@@ -146,7 +146,7 @@ GET  /api/admin/sessions/active
 GET  /api/admin/sessions/history
 ```
 
-The Stage 3 and Stage 4 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
+The TMA, Stage 3, and Stage 4 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
 
 Telegram MiniApp frontend:
 
@@ -170,6 +170,10 @@ VITE_TMA_BASE_PATH=/tma/
 ```
 
 If `VITE_TMA_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_TMA_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/tma/`.
+
+When opened inside Telegram, the TMA sends raw `window.Telegram.WebApp.initData` to `POST /api/tma/auth/login`. The backend validates the signature and `auth_date`, creates or updates the user, and returns a short-lived TMA JWT. The TMA stores that token in React memory only and sends it as `Authorization: Bearer <tma-token>` to user and session APIs.
+
+Normal browser development has no Telegram `initData`. To use the local demo identity, set `TMA_DEV_AUTH_ENABLED=true` in the backend environment and configure the `TMA_DEV_*` identity variables. Keep `TMA_DEV_AUTH_ENABLED=false` in production.
 
 Admin frontend flow:
 
@@ -243,28 +247,28 @@ B01 L   B02 L   B03 XL  B04 XL
 
 ## Backend API Examples
 
-Create or update a Telegram user placeholder:
+Authenticate a Telegram MiniApp user:
 
 ```sh
-curl -X POST http://localhost:3000/api/tma/users/upsert \
+curl -X POST http://localhost:3000/api/tma/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"telegramId":"1001","username":"demo","firstName":"Demo","lastName":"User"}'
+  -d '{"initData":"<raw-window.Telegram.WebApp.initData>"}'
 ```
 
 Start a storage session:
 
 ```sh
 curl -X POST http://localhost:3000/api/tma/sessions \
+  -H 'Authorization: Bearer <tma-token>' \
   -H 'Content-Type: application/json' \
-  -d '{"telegramId":"1001","requestedSize":"M"}'
+  -d '{"requestedSize":"M"}'
 ```
 
 Finish a storage session:
 
 ```sh
 curl -X POST http://localhost:3000/api/tma/sessions/<session-id>/finish \
-  -H 'Content-Type: application/json' \
-  -d '{"telegramId":"1001"}'
+  -H 'Authorization: Bearer <tma-token>'
 ```
 
 Read public locker data:
@@ -336,21 +340,19 @@ The Stage 5 Telegram MiniApp implements the user-facing MVP flow:
 - assigned locker confirmation;
 - finish storage action.
 
-For MVP, the app uses the current placeholder `telegramId` flow. It attempts to read `window.Telegram.WebApp.initDataUnsafe.user.id` when opened inside Telegram, and falls back to editable demo user `1001` outside Telegram.
+The Stage 10 Telegram MiniApp sends raw `window.Telegram.WebApp.initData` to the backend on load. It does not authenticate with `initDataUnsafe`, editable `telegramId`, query parameters, or request-body identity fields.
 
-Production Telegram `initData` validation is not implemented yet. Stage 10 is planned to replace this placeholder identity flow with backend-validated Telegram MiniApp authentication.
+## Stage 10: Full Telegram MiniApp Integration
 
-## Planned Stage 10: Full Telegram MiniApp Integration
+Stage 10 replaces the placeholder TMA identity flow with Telegram MiniApp authentication based on backend-validated `initData`.
 
-Stage 10 will replace the placeholder TMA identity flow with proper Telegram MiniApp authentication based on Telegram `initData`.
-
-Planned flow:
+Implemented flow:
 
 1. The TMA reads the raw `window.Telegram.WebApp.initData` string when opened inside Telegram.
 2. The TMA sends that raw `initData` to the backend.
 3. The backend validates `initData` cryptographically using the Telegram bot token.
 4. The backend creates or updates the user only after validation succeeds.
-5. The backend returns a short-lived TMA JWT containing the internal `userId` and Telegram identity.
+5. The backend returns a short-lived TMA JWT containing the internal `userId`, Telegram identity, and `scope: "tma"`.
 6. The TMA sends that token as `Authorization: Bearer <token>` to user/session APIs.
 7. The backend stops trusting client-supplied `telegramId` and never uses `initDataUnsafe` for authentication.
 
@@ -366,13 +368,14 @@ Security and local development notes:
 
 - The Telegram bot token stays backend-only.
 - The TMA JWT should be short-lived and scoped to TMA user APIs.
-- The TMA should prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
-- Local browser development without Telegram `initData` must use an explicit development-only demo mode.
+- The TMA keeps the token in memory and re-authenticates from Telegram `initData` on app load.
+- Local browser development without Telegram `initData` uses only the explicit backend `TMA_DEV_AUTH_ENABLED=true` demo mode.
+- Telegram `auth_date` must be no older than `TMA_INIT_DATA_MAX_AGE_SECONDS`, defaulting to 86400 seconds.
 
-Planned deployment impact:
+Deployment impact:
 
-- Stage 10 is expected to add a backend secret such as `TELEGRAM_BOT_TOKEN`.
-- When implemented, the new variable must be added to `.env.example`, `README.md`, and `docs/deployment.md`.
+- Stage 10 adds backend-only `TELEGRAM_BOT_TOKEN` and `TMA_JWT_SECRET`.
+- `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, and `TMA_DEV_*` variables configure token lifetime, stale `initData` rejection, and explicit local demo authentication.
 
 ## Planned Stage 11: Simple Balance and Locker Pricing
 
@@ -407,7 +410,7 @@ First create a local `.env` from placeholders:
 cp .env.example .env
 ```
 
-Edit `.env` before production use. At minimum, replace `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
+Edit `.env` before production use. At minimum, replace `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `JWT_SECRET`, `TELEGRAM_BOT_TOKEN`, and `TMA_JWT_SECRET`.
 
 Start the full stack with attached logs:
 
@@ -530,6 +533,15 @@ API_PORT
 ADMIN_LOGIN
 ADMIN_PASSWORD
 JWT_SECRET
+TELEGRAM_BOT_TOKEN
+TMA_JWT_SECRET
+TMA_JWT_EXPIRES_IN
+TMA_INIT_DATA_MAX_AGE_SECONDS
+TMA_DEV_AUTH_ENABLED
+TMA_DEV_TELEGRAM_ID
+TMA_DEV_USERNAME
+TMA_DEV_FIRST_NAME
+TMA_DEV_LAST_NAME
 TMA_PUBLIC_API_BASE_URL
 VITE_TMA_API_BASE_URL
 VITE_TMA_BASE_PATH
