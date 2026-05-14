@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next and is documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This repository has completed Stage 11: simple balance and locker pricing. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## MVP Scope
 
@@ -17,7 +17,7 @@ The MVP will include:
 - Docker Compose deployment.
 - Nginx routing.
 - Backend-validated Telegram MiniApp `initData` authentication.
-- Planned Stage 11 simple fixed locker pricing and balance deduction.
+- Simple fixed locker pricing and balance deduction.
 - Mandatory documentation.
 
 The MVP will not include:
@@ -377,9 +377,9 @@ Deployment impact:
 - Stage 10 adds backend-only `TELEGRAM_BOT_TOKEN` and `TMA_JWT_SECRET`.
 - `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, and `TMA_DEV_*` variables configure token lifetime, stale `initData` rejection, and explicit local demo authentication.
 
-## Planned Stage 11: Simple Balance and Locker Pricing
+## Stage 11: Simple Balance and Locker Pricing
 
-Stage 11 will add simple MVP balance and pricing rules without adding real payments.
+Stage 11 adds simple MVP balance and pricing rules without adding real payments.
 
 Rules:
 
@@ -387,7 +387,7 @@ Rules:
 - Fixed locker prices are `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
 - Price is based on the assigned locker size, not the requested luggage size.
 - Example: if a user requests `M` but the backend assigns an `L` locker, the cost is `10`.
-- Before storage starts, the backend checks that the user has enough balance for the selected assigned locker.
+- Before storage starts, the backend checks that the user has enough balance for the assigned locker.
 - If balance is insufficient, storage does not start and no locker becomes `OCCUPIED`.
 - When storage is finished, the backend deducts the assigned locker price in the same transaction that completes the session and releases the locker.
 - Admins may still manually edit `User.balance` directly in PostgreSQL for MVP testing.
@@ -399,6 +399,11 @@ MVP exclusions for Stage 11:
 - No refunds.
 - No transaction history unless explicitly approved later.
 - No payment transaction tables by default.
+
+Implementation notes:
+
+- Existing users keep their current balance until edited manually in the database.
+- No payment providers, invoices, refunds, payment entities, or transaction history were added.
 
 ## How To Start The Whole Project
 

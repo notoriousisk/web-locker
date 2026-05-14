@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next and is documentation-only until explicitly implemented.
+The repository has completed Stage 11: simple balance and locker pricing.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module, public read-only module, JWT-protected admin backend, TMA auth module, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, and simple start/stop helper scripts exist.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module with fixed MVP pricing, public read-only module, JWT-protected admin backend, TMA auth module, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, and simple start/stop helper scripts exist.
 
 ## Mandatory Files to Read Before Editing
 
@@ -112,7 +112,7 @@ The MVP includes:
 - Docker Compose deployment.
 - Nginx routing.
 - Full Telegram MiniApp authentication using backend-validated Telegram `initData`.
-- Planned Stage 11: simple fixed locker pricing and balance deduction.
+- Simple fixed locker pricing and balance deduction.
 
 ## Forbidden MVP Features
 
@@ -137,7 +137,7 @@ Do not add these unless the user explicitly requests and approves a scope change
 - Message queues.
 - External managed services required for core MVP operation.
 
-Until Stage 11 is implemented, the `User.balance` field is only a numeric database field. It is displayed in the MiniApp and may be edited manually in the database for MVP testing. Stage 11 must keep the MVP free of real payments while adding fixed prices and balance deduction.
+The `User.balance` field is used for simple fixed MVP pricing. It is displayed in the MiniApp and may still be edited manually in the database for MVP testing. Stage 11 keeps the MVP free of real payments while adding fixed prices and balance deduction.
 
 ## Stage 10 Telegram MiniApp Authentication Rules
 
@@ -158,11 +158,11 @@ Rules for future changes:
 - Keep admin JWTs and TMA JWTs separated by secret and token scope.
 - Stage 10 environment variables are `TELEGRAM_BOT_TOKEN`, `TMA_JWT_SECRET`, `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, `TMA_DEV_AUTH_ENABLED`, `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`.
 
-## Planned Stage 11 Balance and Pricing Rules
+## Stage 11 Balance and Pricing Rules
 
-Stage 11 is planned but not implemented yet.
+Stage 11 is implemented.
 
-Rules for future implementation:
+Rules for future changes:
 
 - New users must start with balance `1000`.
 - Fixed locker prices are `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
@@ -175,6 +175,7 @@ Rules for future implementation:
 - Do not add payment providers, invoices, refunds, or transaction history unless explicitly approved later.
 - Prefer not to add new entities for Stage 11; keep fixed MVP pricing simple unless a schema change is clearly justified and documented.
 - Admin can still manually edit balance directly in the database for MVP testing.
+- Existing users keep their current balance until manually edited in PostgreSQL.
 
 ## Locker Selection Rules
 

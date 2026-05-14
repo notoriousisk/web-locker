@@ -81,9 +81,9 @@ Fields:
 Notes:
 
 - `telegramId` should be unique.
-- Until Stage 11 is implemented, `balance` is a numeric database field only.
-- Planned Stage 11 sets new users to an initial balance of `1000`.
-- Planned Stage 11 uses fixed locker prices and deducts balance when a storage session is finished.
+- New TMA users start with balance `1000`.
+- Stage 11 uses fixed locker prices and deducts balance when a storage session is finished.
+- Existing users keep their current balance until manually edited in PostgreSQL.
 - No payment or transaction table in MVP.
 
 ### Locker
@@ -776,15 +776,24 @@ MVP exclusions:
 
 Current status:
 
-- Planned.
+- Completed.
+
+Stage 11 result:
+
+- New users created through TMA auth start with balance `1000`.
+- Fixed MVP prices are implemented as backend constants: `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
+- Start-session checks balance against the assigned locker size price before marking the locker `OCCUPIED`.
+- Insufficient balance rejects the start-session transaction before creating a session or occupying a locker.
+- Finish-session deducts the assigned locker size price in the same transaction that releases the locker and marks the session `COMPLETED`.
+- The TMA reloads user data after completion and displays the updated balance.
+- No payment providers, invoices, refunds, payment entities, or transaction history were added.
 
 ## 10. Current Project Assumptions
 
 - One locker location only.
 - One PostgreSQL database.
 - Stage 10 includes Telegram MiniApp `initData` validation but does not require a broader Telegram bot command backend.
-- Until Stage 11 is implemented, balance is manually edited in the database.
-- After Stage 11, admin balance test adjustments still happen through direct database edits.
+- Existing balances and admin balance test adjustments still happen through direct database edits.
 - Admin authentication is simple login/password from environment variables.
 - Public display does not require authentication.
 - Polling is acceptable for display updates.

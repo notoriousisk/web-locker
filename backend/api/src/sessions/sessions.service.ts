@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException
@@ -31,6 +32,13 @@ const suitableSizesByRequest: Record<LockerSize, PrismaLockerSize[]> = {
   ],
   [LockerSize.L]: [PrismaLockerSize.L, PrismaLockerSize.XL],
   [LockerSize.XL]: [PrismaLockerSize.XL]
+};
+
+const lockerPrices: Record<PrismaLockerSize, Prisma.Decimal> = {
+  [PrismaLockerSize.S]: new Prisma.Decimal(5),
+  [PrismaLockerSize.M]: new Prisma.Decimal(7),
+  [PrismaLockerSize.L]: new Prisma.Decimal(10),
+  [PrismaLockerSize.XL]: new Prisma.Decimal(15)
 };
 
 const sessionInclude = {
@@ -71,6 +79,14 @@ export class SessionsService {
 
           if (!locker) {
             break;
+          }
+
+          const assignedPrice = lockerPrices[locker.size];
+
+          if (user.balance.lessThan(assignedPrice)) {
+            throw new BadRequestException(
+              `Insufficient balance for ${locker.size} locker`
+            );
           }
 
           const updateResult = await tx.locker.updateMany({
@@ -123,9 +139,20 @@ export class SessionsService {
         throw new NotFoundException('Active session not found');
       }
 
+      const assignedPrice = lockerPrices[session.locker.size];
+
       await tx.locker.update({
         where: { id: session.lockerId },
         data: { status: PrismaLockerStatus.AVAILABLE }
+      });
+
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          balance: {
+            decrement: assignedPrice
+          }
+        }
       });
 
       return tx.storageSession.update({

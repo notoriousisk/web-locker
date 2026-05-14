@@ -52,7 +52,7 @@ export class TmaAuthService {
         username: telegramUser.username,
         firstName: telegramUser.firstName,
         lastName: telegramUser.lastName,
-        balance: new Prisma.Decimal(0)
+        balance: new Prisma.Decimal(1000)
       }
     });
 

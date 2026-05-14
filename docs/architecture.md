@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next as documentation-only future work. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This document describes the planned architecture and current implementation. The repository has completed Stage 11: simple balance and locker pricing. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## System Overview
 
@@ -19,6 +19,7 @@ The backend API owns business logic:
 
 - User profile persistence.
 - Balance reads.
+- Fixed MVP locker pricing and balance deduction.
 - Telegram MiniApp `initData` validation and TMA JWT authentication.
 - Locker assignment.
 - Storage session lifecycle.
@@ -133,16 +134,11 @@ Current backend contents:
 - TMA auth module for backend validation of raw Telegram `initData`, user upsert, and short-lived TMA JWT issuing.
 - Users module for authenticated TMA profile reads.
 - Lockers module for DB-backed locker listing.
-- Sessions module for DB-backed active/history reads, start-session flow, and finish-session flow.
+- Sessions module for DB-backed active/history reads, start-session flow, finish-session flow, fixed price checks, and balance deduction.
 - Public module for unauthenticated locker grid data and basic stats.
 - Admin backend with env-based login, JWT guard, dashboard stats, user/session reads, locker reads, and constrained locker maintenance status updates.
 - TMA user/session endpoints use the TMA JWT identity instead of trusting client-supplied `telegramId`.
-
-Planned Stage 11 backend change:
-
-- Add fixed MVP locker prices.
-- Check user balance before occupying the assigned locker.
-- Deduct the assigned locker price when finishing a session in the same transaction that releases the locker.
+- Stage 11 fixed MVP prices are enforced in the backend: `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
 
 ### Infrastructure: `infra`
 
@@ -234,9 +230,9 @@ Fields:
 Rules:
 
 - `telegramId` must be unique.
-- Until Stage 11 is implemented, `balance` is only a numeric field.
-- Stage 11 is planned to make new users start with balance `1000`.
-- Stage 11 must keep admin balance edits as direct database edits for MVP testing.
+- New users created through TMA auth start with balance `1000`.
+- Existing users keep their current balance until edited manually in the database.
+- Admin balance edits remain direct database edits for MVP testing.
 - No payment transaction model exists in MVP.
 
 ### Locker
@@ -405,9 +401,9 @@ Stage 10 environment variables:
 - `TMA_DEV_FIRST_NAME`
 - `TMA_DEV_LAST_NAME`
 
-## Planned Stage 11 Balance and Pricing
+## Stage 11 Balance and Pricing
 
-Stage 11 will add simple fixed balance and pricing behavior without real payments.
+Stage 11 adds simple fixed balance and pricing behavior without real payments.
 
 Pricing rules:
 
@@ -509,7 +505,7 @@ The frontend does not implement locker status rules locally beyond hiding invali
 4. User selects luggage size: `S`, `M`, `L`, or `XL`.
 5. Frontend sends selected size to backend with the TMA JWT.
 6. Backend finds the smallest suitable available locker.
-7. Planned Stage 11 flow checks balance against the assigned locker size price.
+7. Stage 11 flow checks balance against the assigned locker size price.
 8. Backend creates an active storage session.
 9. Backend marks the locker as `OCCUPIED`.
 10. User sees the assigned locker code.
@@ -520,7 +516,7 @@ The frontend does not implement locker status rules locally beyond hiding invali
 2. User clicks finish or take luggage.
 3. Backend marks the session as `COMPLETED`.
 4. Backend sets `endedAt`.
-5. Planned Stage 11 flow deducts the assigned locker size price in the same transaction.
+5. Stage 11 flow deducts the assigned locker size price in the same transaction.
 6. Backend marks the locker as `AVAILABLE`.
 7. User no longer sees the session as active.
 

@@ -2,7 +2,7 @@
 
 This document describes the VPS deployment strategy for `locker-mvp`.
 
-The repository has completed Stage 10: full Telegram MiniApp authentication with backend-validated Telegram `initData`. Stage 11 is planned next and is documentation-only at this point. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+The repository has completed Stage 11: simple balance and locker pricing. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## VPS Assumptions
 
@@ -224,11 +224,11 @@ Stage 10 Telegram MiniApp auth behavior:
 - Local browser development may not have Telegram `initData`; use `TMA_DEV_AUTH_ENABLED=true` only in local development.
 - Production Telegram MiniApp use requires HTTPS. The current Compose stack publishes HTTP and assumes TLS termination happens outside the stack unless direct TLS support is explicitly added and documented later.
 
-Planned Stage 11 deployment impact:
+Stage 11 deployment impact:
 
-- Simple fixed pricing and balance deduction are planned as backend business logic.
-- No new deployment infrastructure is planned.
-- No payment provider credentials, invoice services, queues, or external managed services should be introduced for Stage 11.
+- Simple fixed pricing and balance deduction are backend business logic only.
+- No new environment variables, Docker services, Nginx routes, payment provider credentials, invoice services, queues, or external managed services were introduced.
+- Existing users keep their current balance until manually edited in PostgreSQL.
 
 ## Telegram MiniApp Build Notes
 
