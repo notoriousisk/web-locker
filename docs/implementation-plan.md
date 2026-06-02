@@ -146,6 +146,7 @@ Planned modules:
 - Auth module.
 - Admin module.
 - Public module.
+- Observability support implemented in Stage 12.
 
 ### Prisma Module
 
@@ -369,6 +370,7 @@ Current order:
 9. Stage 9: Verification and Cleanup.
 10. Stage 10: Full Telegram MiniApp Integration.
 11. Stage 11: Simple Balance and Locker Pricing.
+12. Stage 12: Observability.
 
 ### Stage 1: Repository Skeleton and Documentation
 
@@ -788,6 +790,126 @@ Stage 11 result:
 - The TMA reloads user data after completion and displays the updated balance.
 - No payment providers, invoices, refunds, payment entities, or transaction history were added.
 
+### Stage 12: Observability
+
+Stage 12 is implemented.
+
+Goals:
+
+- Add production-oriented MVP observability without changing the Docker Compose deployment model.
+- Add structured backend logs.
+- Add request/response logging for API requests.
+- Add safe error logging.
+- Add audit-relevant event logs for admin, TMA, and public API flows.
+- Add storage session lifecycle logs.
+- Add locker assignment logs.
+- Add auth logs without leaking secrets, credentials, tokens, or raw Telegram `initData`.
+- Document Docker Compose log viewing workflows.
+- Improve basic health checks.
+- Add lightweight metrics through a Prometheus-compatible endpoint without adding a required external platform.
+
+Acceptance criteria:
+
+- Backend logs have a consistent structured format that can be filtered by timestamp, level, event name, request id, route, status code, latency, actor type, and safe domain ids.
+- Request logs include method, route, status code, latency, and request id.
+- Response logging does not include full response bodies by default.
+- Error logs include safe context and useful stack traces.
+- Admin audit events are logged for login success/failure, protected route auth failures, and locker status changes.
+- TMA audit events are logged for Telegram auth success/failure, TMA JWT validation failures, session start attempts, and session finish attempts.
+- Public API failures are logged.
+- Storage session logs cover start success, start failure, insufficient balance attempts, no-locker-available attempts, finish success, finish failure, balance deduction, and locker release.
+- Locker assignment logs include requested size, assigned locker size, locker id/code, and selection outcome.
+- Metrics cover total lockers, available lockers, occupied lockers, maintenance lockers, active sessions, completed sessions, failed start attempts, insufficient balance attempts, and auth failures.
+- Health checks verify API liveness and database connectivity at an MVP-appropriate level.
+- Deployment docs include Docker Compose log commands for all services and service-specific investigation.
+- Verification proves logs are emitted, sensitive values are redacted, health checks work, and metrics return expected values if implemented.
+
+Logging plan:
+
+- Emit backend logs to stdout/stderr so Docker Compose remains the primary collection path.
+- Use structured JSON or consistently shaped key/value logs.
+- Include `timestamp`, `level`, `event`, `requestId`, `method`, `route`, `statusCode`, `latencyMs`, `actorType`, and safe ids where available.
+- Use event names for important business and audit events, such as `tma_login_success`, `tma_login_failure`, `admin_login_success`, `admin_login_failure`, `admin_locker_status_changed`, `storage_session_start_success`, `storage_session_start_failure`, `storage_start_insufficient_balance`, `locker_assigned`, `storage_session_finish_success`, and auth guard failures.
+- Record enough context for support without logging request secrets or full payloads.
+
+Metrics plan:
+
+- Start with lightweight in-process API metrics.
+- Prefer gauges for current state: total lockers, available lockers, occupied lockers, maintenance lockers, and active sessions.
+- Prefer counters for events: completed sessions, failed start attempts, insufficient balance attempts, and auth failures.
+- Include basic operational metrics such as request count, request duration, error count, and process uptime if implementation remains simple.
+- A Prometheus-compatible `GET /api/metrics` endpoint is implemented without adding Prometheus, Grafana, or another platform as a required service.
+- The metrics endpoint is unauthenticated in the MVP because it exposes only aggregate counters and gauges. Restrict it at an outer proxy if a deployment should not expose metrics publicly.
+
+Health check plan:
+
+- Keep the existing basic `GET /api/health` behavior for API liveness.
+- Add `GET /api/health/db` to verify Prisma can reach PostgreSQL.
+- Keep checks fast and deterministic.
+- Docker Compose uses `/api/health/db` for the `api` service health check.
+
+Docker/VPS log commands:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h api
+docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
+docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
+docker compose --env-file .env -f infra/docker-compose.yml logs -f tma
+docker compose --env-file .env -f infra/docker-compose.yml logs -f admin
+docker compose --env-file .env -f infra/docker-compose.yml logs -f display
+```
+
+Security and privacy rules:
+
+- Never log `TELEGRAM_BOT_TOKEN`.
+- Never log `JWT_SECRET`.
+- Never log `TMA_JWT_SECRET`.
+- Never log raw Telegram `initData`.
+- Never log `Authorization` headers.
+- Never log passwords.
+- Never log database passwords.
+- Never log full JWTs.
+- Never log full database connection strings.
+- Redact sensitive request headers and request body fields before logging.
+- Avoid logging full request bodies by default.
+- Prefer safe internal ids and event outcomes over credentials or tokens.
+
+MVP exclusions:
+
+- No large observability platform.
+- No required external paid services.
+- No Kubernetes.
+- No required Prometheus/Grafana stack.
+- No complex distributed tracing requirement.
+- No message queues or observability microservices.
+- No long-term analytics warehouse.
+
+Future optional improvements:
+
+- Prometheus and Grafana through Docker Compose if operational needs justify the extra services.
+- OpenTelemetry tracing for API/database performance investigations.
+- Alerting for API downtime, database health failure, high auth failure rate, or locker capacity exhaustion.
+- Host-level Docker log rotation policy.
+- Admin-visible operational dashboard using already collected metrics.
+
+Current status:
+
+- Completed.
+
+Stage 12 result:
+
+- Added an observability module under `backend/api/src/observability`.
+- Added structured JSON request logs with request id, method, route/path, status code, latency, and safe actor context.
+- Added safe error logging with stack traces and sanitized client error responses for unexpected server errors.
+- Added audit logs for admin login success/failure, admin guard failures, admin locker status changes, TMA login success/failure, TMA guard failures, public API failures, locker assignment, storage session start success/failure, insufficient balance, no-locker-available attempts, finish success/failure, and balance deduction.
+- Added lightweight in-process API counters and DB-backed gauges exposed at `GET /api/metrics` in Prometheus text format.
+- Added `GET /api/health/db` for database connectivity checks.
+- Updated the Docker Compose `api` health check to call `/api/health/db`.
+- Added no new environment variables, npm dependencies, database schema changes, Nginx routes, Docker services, payment features, queues, or external observability platforms.
+
 ## 10. Current Project Assumptions
 
 - One locker location only.
@@ -799,6 +921,7 @@ Stage 11 result:
 - Polling is acceptable for display updates.
 - Physical locker hardware integration is outside MVP.
 - Docker Compose is the only supported deployment path for MVP.
+- Stage 12 observability uses Docker Compose logs first and avoids external platforms unless explicitly approved.
 
 ## 11. Explicit MVP Exclusions
 
@@ -812,6 +935,7 @@ Do not build these in MVP:
 - Physical locker integration.
 - WebSockets.
 - Complex analytics.
+- Large observability platforms.
 - Multiple locker locations.
 - QR codes.
 - 3D visualization.
@@ -826,3 +950,4 @@ Updated boundaries:
 
 - Stage 10 includes backend validation of Telegram MiniApp `initData`, but does not add complex auth roles, managed identity services, or Telegram bot command workflows.
 - Stage 11 includes simple balance and fixed locker pricing, but does not add real payments, invoices, refunds, or payment transaction history.
+- Stage 12 implements structured logs, basic health checks, and lightweight metrics, but does not add a required observability platform, Kubernetes, paid services, or complex tracing.

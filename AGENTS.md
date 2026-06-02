@@ -6,9 +6,9 @@ The project is an MVP for an electronic luggage locker system with a Telegram Mi
 
 ## Current Stage
 
-The repository has completed Stage 11: simple balance and locker pricing.
+The repository has completed Stage 12: production-oriented MVP observability.
 
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module with fixed MVP pricing, public read-only module, JWT-protected admin backend, TMA auth module, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, and simple start/stop helper scripts exist.
+The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module with fixed MVP pricing, public read-only module, JWT-protected admin backend, TMA auth module, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, simple start/stop helper scripts, structured backend logs, database health check, and lightweight metrics endpoint exist.
 
 ## Mandatory Files to Read Before Editing
 
@@ -113,6 +113,7 @@ The MVP includes:
 - Nginx routing.
 - Full Telegram MiniApp authentication using backend-validated Telegram `initData`.
 - Simple fixed locker pricing and balance deduction.
+- Production-oriented MVP observability through structured logs, basic health checks, Docker Compose logs, and a lightweight metrics endpoint.
 
 ## Forbidden MVP Features
 
@@ -126,6 +127,7 @@ Do not add these unless the user explicitly requests and approves a scope change
 - Physical locker integration.
 - WebSockets.
 - Complex analytics.
+- Large observability platforms.
 - Multiple locker locations.
 - QR codes.
 - 3D visualization.
@@ -176,6 +178,38 @@ Rules for future changes:
 - Prefer not to add new entities for Stage 11; keep fixed MVP pricing simple unless a schema change is clearly justified and documented.
 - Admin can still manually edit balance directly in the database for MVP testing.
 - Existing users keep their current balance until manually edited in PostgreSQL.
+
+## Stage 12 Observability Rules
+
+Stage 12 is implemented.
+
+Rules for future changes:
+
+- Keep observability MVP-friendly and Docker Compose compatible.
+- Prefer structured backend logs written to stdout/stderr so `docker compose logs` remains the primary log viewer.
+- Keep request/response logs for API requests with method, route, status code, latency, request id, and safe actor context.
+- Log backend errors with safe context and useful stack traces, but never with secrets or sensitive request bodies.
+- Keep audit-relevant logs for admin, TMA, and public APIs, including admin login success/failure, admin locker status changes, TMA auth success/failure, protected route auth failures, public API failures, storage session lifecycle events, locker assignment, failed start attempts, and insufficient balance attempts.
+- Storage session logs should include safe ids such as `userId`, `sessionId`, `lockerId`, locker code, requested size, assigned size, price, and result when available.
+- Auth logs must never include raw Telegram `initData`, `Authorization` headers, JWTs, passwords, or secrets.
+- Metrics are lightweight in-process API counters plus DB-backed gauges exposed at `GET /api/metrics` in Prometheus text format. Do not add Prometheus, Grafana, or another platform unless explicitly approved later.
+- Useful business metrics include total lockers, available lockers, occupied lockers, maintenance lockers, active sessions, completed sessions, failed start attempts, insufficient balance attempts, and auth failures.
+- Health checks cover API liveness at `GET /api/health` and database connectivity at `GET /api/health/db`.
+- The Docker Compose `api` health check uses `GET /api/health/db`.
+- Deployment docs must include Docker Compose log commands for all services and service-specific logs.
+- Future agents changing observability must verify that logs are emitted, sensitive values are redacted, health checks work, and metrics return the expected counters/gauges.
+
+Never log:
+
+- `TELEGRAM_BOT_TOKEN`
+- `JWT_SECRET`
+- `TMA_JWT_SECRET`
+- raw Telegram `initData`
+- `Authorization` headers
+- passwords
+- database passwords
+- full JWTs
+- full database connection strings
 
 ## Locker Selection Rules
 

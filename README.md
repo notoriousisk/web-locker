@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
 
-This repository has completed Stage 11: simple balance and locker pricing. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This repository has completed Stage 12: production-oriented MVP observability. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## MVP Scope
 
@@ -18,6 +18,7 @@ The MVP will include:
 - Nginx routing.
 - Backend-validated Telegram MiniApp `initData` authentication.
 - Simple fixed locker pricing and balance deduction.
+- Production-oriented MVP observability through structured logs, basic health checks, Docker Compose logs, and lightweight metrics.
 - Mandatory documentation.
 
 The MVP will not include:
@@ -30,6 +31,7 @@ The MVP will not include:
 - Physical locker integration.
 - WebSockets unless explicitly approved later.
 - Complex analytics.
+- Large observability platforms.
 - Multiple locker locations.
 - QR codes.
 - 3D visualization.
@@ -114,10 +116,12 @@ npm run start:dev
 
 The backend reads environment variables from `backend/api/.env` or the repository-root `.env`.
 
-The backend exposes a basic health endpoint at:
+The backend exposes basic liveness, database readiness, and metrics endpoints:
 
 ```txt
 GET /api/health
+GET /api/health/db
+GET /api/metrics
 ```
 
 Current backend API endpoints:
@@ -134,6 +138,10 @@ GET  /api/lockers
 
 GET  /api/public/lockers
 GET  /api/public/stats
+
+GET  /api/health
+GET  /api/health/db
+GET  /api/metrics
 
 POST /api/admin/auth/login
 GET  /api/admin/auth/me
@@ -405,6 +413,29 @@ Implementation notes:
 - Existing users keep their current balance until edited manually in the database.
 - No payment providers, invoices, refunds, payment entities, or transaction history were added.
 
+## Stage 12: Observability
+
+Stage 12 is implemented. It adds production-oriented MVP observability while staying Docker Compose compatible and avoiding paid external services.
+
+Implemented behavior:
+
+- Backend API logs are structured JSON written to stdout/stderr for `docker compose logs`.
+- Every API request emits an `api_request` event with request id, method, route/path, status code, latency, and safe actor context.
+- Unhandled and HTTP errors emit `api_error` events with safe context and stack traces where useful.
+- Audit-relevant events are logged for admin login success/failure, admin JWT failures, admin locker status changes, TMA login success/failure, TMA JWT failures, public API failures, locker assignment, storage session start success/failure, insufficient balance attempts, no-locker-available attempts, finish success/failure, and balance deduction.
+- `GET /api/health` remains a lightweight API process liveness endpoint.
+- `GET /api/health/db` verifies that Prisma can reach PostgreSQL and is used by the Docker `api` health check.
+- `GET /api/metrics` exposes lightweight Prometheus-compatible text metrics from the API process and PostgreSQL state.
+- Metrics include API request counters, request duration sums/counts, error counters, process uptime, locker gauges, session gauges, auth failure counters, failed start counters, and insufficient balance counters.
+- No observability dependencies, Docker services, Nginx routes, database tables, or external platforms were added.
+
+Security and privacy rules:
+
+- Never log `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `TMA_JWT_SECRET`, raw Telegram `initData`, `Authorization` headers, passwords, database passwords, full JWTs, or full database connection strings.
+- Prefer internal user ids, Telegram ids where useful for TMA support, locker ids/codes, session ids, route names, status codes, and event names.
+- Request logging does not log request bodies or response bodies by default. Shared log redaction also redacts sensitive key names if they are passed to the logger.
+- Keep observability local to Docker Compose for MVP. Do not add Kubernetes, paid external observability services, distributed tracing, or complex log pipelines unless explicitly approved later.
+
 ## How To Start The Whole Project
 
 The full MVP runs through Docker Compose. The VPS and local Docker flow are the same.
@@ -439,6 +470,8 @@ Browser URLs after startup:
 
 ```txt
 http://localhost/api/health
+http://localhost/api/health/db
+http://localhost/api/metrics
 http://localhost/tma
 http://localhost/admin
 http://localhost/display
@@ -462,6 +495,21 @@ View logs:
 
 ```sh
 docker compose --env-file .env -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h api
+docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
+docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
+docker compose --env-file .env -f infra/docker-compose.yml logs -f tma
+docker compose --env-file .env -f infra/docker-compose.yml logs -f admin
+docker compose --env-file .env -f infra/docker-compose.yml logs -f display
+```
+
+View health and metrics:
+
+```sh
+curl http://localhost/api/health
+curl http://localhost/api/health/db
+curl http://localhost/api/metrics
 ```
 
 Restart all services:
@@ -587,6 +635,12 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 
 # view logs
 docker compose --env-file .env -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
+
+# view health and metrics
+curl http://localhost/api/health
+curl http://localhost/api/health/db
+curl http://localhost/api/metrics
 
 # run Prisma migrations
 docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy

@@ -2,7 +2,7 @@
 
 `locker-mvp` is an MVP for an electronic luggage locker system. Users interact through a Telegram MiniApp, administrators manage system state through a web panel, and a public display page shows locker availability.
 
-This document describes the planned architecture and current implementation. The repository has completed Stage 11: simple balance and locker pricing. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+This document describes the planned architecture and current implementation. The repository has completed Stage 12: production-oriented MVP observability. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp frontend exists under `apps/tma`, the admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## System Overview
 
@@ -23,6 +23,7 @@ The backend API owns business logic:
 - Telegram MiniApp `initData` validation and TMA JWT authentication.
 - Locker assignment.
 - Storage session lifecycle.
+- Structured observability events, safe request/error logging, health checks, and lightweight metrics.
 - Admin authentication.
 - Admin locker/session/user operations.
 - Public locker grid data.
@@ -126,7 +127,9 @@ Current backend contents:
 
 - Minimal NestJS application scaffold.
 - Global `/api` prefix.
-- `GET /api/health` health endpoint.
+- `GET /api/health` liveness endpoint.
+- `GET /api/health/db` database readiness endpoint.
+- `GET /api/metrics` lightweight Prometheus-compatible metrics endpoint.
 - Global `ConfigModule` reading `backend/api/.env` or root `.env`.
 - Global `PrismaModule` and `PrismaService`.
 - Shared TypeScript enums for locker size, locker status, and session status.
@@ -139,6 +142,7 @@ Current backend contents:
 - Admin backend with env-based login, JWT guard, dashboard stats, user/session reads, locker reads, and constrained locker maintenance status updates.
 - TMA user/session endpoints use the TMA JWT identity instead of trusting client-supplied `telegramId`.
 - Stage 11 fixed MVP prices are enforced in the backend: `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
+- Stage 12 observability module emits structured logs to stdout/stderr, logs request/error/audit events, exposes a database health check, and exposes lightweight Prometheus-compatible metrics.
 
 ### Infrastructure: `infra`
 
@@ -432,10 +436,112 @@ MVP exclusions:
 - No transaction history by default.
 - No payment transaction tables unless explicitly approved later.
 
+## Stage 12 Observability
+
+Stage 12 is implemented. It improves production support for the MVP without changing the deployment model or adding large external systems.
+
+### Logging
+
+Backend logs are structured JSON records written to stdout/stderr so `docker compose logs` remains the primary MVP log viewer. Logs include:
+
+- `timestamp`
+- `level`
+- `event`
+- `requestId`
+- `method`
+- `route`
+- `statusCode`
+- `latencyMs`
+- `actorType` such as `admin`, `tma-user`, `public`, or `anonymous`
+- safe actor ids where available
+- safe domain ids such as `userId`, `sessionId`, `lockerId`, and locker code
+
+Request/response logs cover all API requests while avoiding request bodies, response bodies, and sensitive input. Error logs include the event name, route, status code, safe message, and stack trace where useful.
+
+Audit-relevant event logs include:
+
+- Admin login success and failure.
+- Admin JWT validation failures.
+- Admin locker status changes.
+- TMA login success and failure.
+- TMA JWT validation failures.
+- Public API failures.
+- Storage session start success.
+- Storage session start failure.
+- Insufficient balance attempts.
+- No-locker-available attempts.
+- Locker assignment decisions.
+- Storage session finish success and failure.
+- Balance deduction during session finish.
+
+### Metrics
+
+Stage 12 uses lightweight in-process API counters plus database-backed gauges and avoids a large platform. Metrics are exposed in Prometheus text format at:
+
+```txt
+GET /api/metrics
+```
+
+Implemented MVP business metrics:
+
+- Total lockers.
+- Available lockers.
+- Occupied lockers.
+- Maintenance lockers.
+- Active sessions.
+- Completed sessions.
+- Failed start attempts.
+- Insufficient balance attempts.
+- Auth failures.
+
+Operational metrics include request count, request duration sum/count, error count, API liveness, and process uptime.
+
+The metrics endpoint is unauthenticated in the MVP because it exposes only aggregate operational and business counts. If public exposure is not acceptable for a deployment, restrict `/api/metrics` at an outer proxy before exposing the stack.
+
+### Health Checks
+
+Health checks remain simple:
+
+- `GET /api/health` checks API process liveness.
+- `GET /api/health/db` verifies Prisma can reach PostgreSQL with a fast `SELECT 1`.
+- Docker Compose uses `/api/health/db` for the `api` service health check.
+- Avoid complex dependency graphs or external health services.
+
+### Security and Privacy Rules
+
+Logs must never contain:
+
+- `TELEGRAM_BOT_TOKEN`
+- `JWT_SECRET`
+- `TMA_JWT_SECRET`
+- raw Telegram `initData`
+- `Authorization` headers
+- passwords
+- database passwords
+- full JWTs
+- full database connection strings
+
+Request logging does not log headers, request bodies, or response bodies by default. Shared log redaction also redacts sensitive key names if they are passed to the logger. Authentication logs record outcome and safe identity context, not credentials or tokens.
+
+### MVP Exclusions
+
+Stage 12 should not add:
+
+- Kubernetes.
+- Paid external observability services.
+- Large log aggregation platforms.
+- Distributed tracing as a required MVP feature.
+- Message queues or separate observability microservices.
+- Long-term analytics warehouses.
+
+Future optional improvements may include dashboarding, alerting, OpenTelemetry tracing, host-level log rotation policy, and a Prometheus/Grafana stack if the operational need justifies the added deployment complexity.
+
 ## Current Backend Endpoints
 
 ```txt
 GET  /api/health
+GET  /api/health/db
+GET  /api/metrics
 
 POST /api/tma/auth/login
 GET  /api/tma/me
@@ -563,5 +669,6 @@ Updated planned limitations:
 
 - Stage 10 adds Telegram `initData` validation but does not add complex auth roles, external managed auth services, or a Telegram bot command backend.
 - Stage 11 adds balance deduction but does not add payment providers, invoices, refunds, or transaction history.
+- Stage 12 implements observability but does not require a large observability platform, Kubernetes, paid external services, or complex tracing.
 
 These limitations keep the first version small, deployable, and testable.

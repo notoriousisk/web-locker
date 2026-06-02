@@ -8,12 +8,16 @@ import {
   LockerStatus,
   SessionStatus
 } from '@prisma/client';
+import { ObservabilityLogger } from '../observability/observability-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateLockerStatusDto } from './dto/update-locker-status.dto';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: ObservabilityLogger
+  ) {}
 
   async getDashboard() {
     const [
@@ -95,10 +99,21 @@ export class AdminService {
       );
     }
 
-    return this.prisma.locker.update({
+    const updatedLocker = await this.prisma.locker.update({
       where: { id: locker.id },
       data: { status }
     });
+
+    this.logger.info('admin_locker_status_changed', {
+      actorType: 'admin',
+      lockerId: locker.id,
+      lockerCode: locker.code,
+      previousStatus: locker.status,
+      nextStatus: updatedLocker.status,
+      result: 'success'
+    });
+
+    return updatedLocker;
   }
 
   listActiveSessions() {

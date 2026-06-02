@@ -15,6 +15,8 @@ import {
   parseLockerSize,
   requireNonEmptyString
 } from '../common/validation';
+import { MetricsService } from '../observability/metrics.service';
+import { ObservabilityLogger } from '../observability/observability-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StartSessionDto } from './dto/start-session.dto';
 
@@ -48,122 +50,241 @@ const sessionInclude = {
 
 @Injectable()
 export class SessionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly logger: ObservabilityLogger,
+    private readonly metrics: MetricsService
+  ) {}
 
-  startSession(userIdValue: unknown, dto: StartSessionDto) {
+  async startSession(userIdValue: unknown, dto: StartSessionDto) {
     const userId = requireNonEmptyString(userIdValue, 'userId');
     const requestedSize = parseLockerSize(dto.requestedSize);
 
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.findUnique({
-        where: { id: userId }
-      });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: userId }
+        });
 
-      if (!user) {
-        throw new NotFoundException('User not found');
-      }
+        if (!user) {
+          throw new NotFoundException('User not found');
+        }
 
-      for (const suitableSize of suitableSizesByRequest[requestedSize]) {
-        while (true) {
-          const locker = await tx.locker.findFirst({
-            where: {
-              size: suitableSize,
-              status: PrismaLockerStatus.AVAILABLE
-            },
-            orderBy: [
-              { row: 'asc' },
-              { column: 'asc' },
-              { code: 'asc' }
-            ]
-          });
+        for (const suitableSize of suitableSizesByRequest[requestedSize]) {
+          while (true) {
+            const locker = await tx.locker.findFirst({
+              where: {
+                size: suitableSize,
+                status: PrismaLockerStatus.AVAILABLE
+              },
+              orderBy: [
+                { row: 'asc' },
+                { column: 'asc' },
+                { code: 'asc' }
+              ]
+            });
 
-          if (!locker) {
-            break;
-          }
-
-          const assignedPrice = lockerPrices[locker.size];
-
-          if (user.balance.lessThan(assignedPrice)) {
-            throw new BadRequestException(
-              `Insufficient balance for ${locker.size} locker`
-            );
-          }
-
-          const updateResult = await tx.locker.updateMany({
-            where: {
-              id: locker.id,
-              status: PrismaLockerStatus.AVAILABLE
-            },
-            data: {
-              status: PrismaLockerStatus.OCCUPIED
+            if (!locker) {
+              break;
             }
-          });
 
-          if (updateResult.count === 0) {
-            continue;
-          }
+            const assignedPrice = lockerPrices[locker.size];
 
-          return tx.storageSession.create({
-            data: {
+            if (user.balance.lessThan(assignedPrice)) {
+              this.metrics.increment('locker_insufficient_balance_total', {
+                requestedSize,
+                assignedSize: locker.size
+              });
+              this.metrics.increment('locker_storage_start_failures_total', {
+                reason: 'insufficient_balance'
+              });
+              this.logger.warn('storage_start_insufficient_balance', {
+                actorType: 'tma-user',
+                actorId: user.id,
+                userId: user.id,
+                lockerId: locker.id,
+                lockerCode: locker.code,
+                requestedSize,
+                assignedSize: locker.size,
+                price: assignedPrice.toString(),
+                balance: user.balance.toString(),
+                result: 'failure'
+              });
+              throw new BadRequestException(
+                `Insufficient balance for ${locker.size} locker`
+              );
+            }
+
+            const updateResult = await tx.locker.updateMany({
+              where: {
+                id: locker.id,
+                status: PrismaLockerStatus.AVAILABLE
+              },
+              data: {
+                status: PrismaLockerStatus.OCCUPIED
+              }
+            });
+
+            if (updateResult.count === 0) {
+              continue;
+            }
+
+            this.logger.info('locker_assigned', {
+              actorType: 'tma-user',
+              actorId: user.id,
               userId: user.id,
               lockerId: locker.id,
-              requestedSize: requestedSize as PrismaLockerSize,
-              status: PrismaSessionStatus.ACTIVE
-            },
-            include: sessionInclude
-          });
+              lockerCode: locker.code,
+              requestedSize,
+              assignedSize: locker.size,
+              price: assignedPrice.toString(),
+              result: 'success'
+            });
+
+            const session = await tx.storageSession.create({
+              data: {
+                userId: user.id,
+                lockerId: locker.id,
+                requestedSize: requestedSize as PrismaLockerSize,
+                status: PrismaSessionStatus.ACTIVE
+              },
+              include: sessionInclude
+            });
+
+            this.logger.info('storage_session_start_success', {
+              actorType: 'tma-user',
+              actorId: user.id,
+              userId: user.id,
+              sessionId: session.id,
+              lockerId: locker.id,
+              lockerCode: locker.code,
+              requestedSize,
+              assignedSize: locker.size,
+              price: assignedPrice.toString(),
+              result: 'success'
+            });
+
+            return session;
+          }
         }
+
+        this.metrics.increment('locker_storage_start_failures_total', {
+          reason: 'no_locker_available'
+        });
+        this.logger.warn('storage_start_no_locker_available', {
+          actorType: 'tma-user',
+          actorId: user.id,
+          userId: user.id,
+          requestedSize,
+          result: 'failure'
+        });
+        throw new ConflictException('No suitable locker is available');
+      });
+    } catch (error) {
+      if (
+        !(error instanceof BadRequestException) &&
+        !(error instanceof ConflictException)
+      ) {
+        this.metrics.increment('locker_storage_start_failures_total', {
+          reason: 'error'
+        });
+        this.logger.warn('storage_session_start_failure', {
+          actorType: 'tma-user',
+          actorId: userId,
+          userId,
+          requestedSize,
+          result: 'failure',
+          reason: error instanceof Error ? error.message : 'unknown'
+        });
       }
 
-      throw new ConflictException('No suitable locker is available');
-    });
+      throw error;
+    }
   }
 
-  finishSession(userIdValue: unknown, sessionIdValue: unknown) {
+  async finishSession(userIdValue: unknown, sessionIdValue: unknown) {
     const userId = requireNonEmptyString(userIdValue, 'userId');
     const sessionId = requireNonEmptyString(sessionIdValue, 'sessionId');
 
-    return this.prisma.$transaction(async (tx) => {
-      const session = await tx.storageSession.findFirst({
-        where: {
-          id: sessionId,
-          status: PrismaSessionStatus.ACTIVE,
-          userId
-        },
-        include: {
-          locker: true
-        }
-      });
-
-      if (!session) {
-        throw new NotFoundException('Active session not found');
-      }
-
-      const assignedPrice = lockerPrices[session.locker.size];
-
-      await tx.locker.update({
-        where: { id: session.lockerId },
-        data: { status: PrismaLockerStatus.AVAILABLE }
-      });
-
-      await tx.user.update({
-        where: { id: userId },
-        data: {
-          balance: {
-            decrement: assignedPrice
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        const session = await tx.storageSession.findFirst({
+          where: {
+            id: sessionId,
+            status: PrismaSessionStatus.ACTIVE,
+            userId
+          },
+          include: {
+            locker: true
           }
-        }
-      });
+        });
 
-      return tx.storageSession.update({
-        where: { id: session.id },
-        data: {
-          status: PrismaSessionStatus.COMPLETED,
-          endedAt: new Date()
-        },
-        include: sessionInclude
+        if (!session) {
+          throw new NotFoundException('Active session not found');
+        }
+
+        const assignedPrice = lockerPrices[session.locker.size];
+
+        await tx.locker.update({
+          where: { id: session.lockerId },
+          data: { status: PrismaLockerStatus.AVAILABLE }
+        });
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            balance: {
+              decrement: assignedPrice
+            }
+          }
+        });
+
+        this.logger.info('storage_session_balance_deducted', {
+          actorType: 'tma-user',
+          actorId: userId,
+          userId,
+          sessionId: session.id,
+          lockerId: session.lockerId,
+          lockerCode: session.locker.code,
+          assignedSize: session.locker.size,
+          price: assignedPrice.toString(),
+          result: 'success'
+        });
+
+        const completedSession = await tx.storageSession.update({
+          where: { id: session.id },
+          data: {
+            status: PrismaSessionStatus.COMPLETED,
+            endedAt: new Date()
+          },
+          include: sessionInclude
+        });
+
+        this.logger.info('storage_session_finish_success', {
+          actorType: 'tma-user',
+          actorId: userId,
+          userId,
+          sessionId: session.id,
+          lockerId: session.lockerId,
+          lockerCode: session.locker.code,
+          assignedSize: session.locker.size,
+          price: assignedPrice.toString(),
+          result: 'success'
+        });
+
+        return completedSession;
       });
-    });
+    } catch (error) {
+      this.logger.warn('storage_session_finish_failure', {
+        actorType: 'tma-user',
+        actorId: userId,
+        userId,
+        sessionId,
+        result: 'failure',
+        reason: error instanceof Error ? error.message : 'unknown'
+      });
+      throw error;
+    }
   }
 
   listUserActiveSessions(userIdValue: unknown) {

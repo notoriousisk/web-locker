@@ -4,6 +4,7 @@ import { AdminModule } from './admin/admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { LockersModule } from './lockers/lockers.module';
+import { ObservabilityModule } from './observability/observability.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { PublicModule } from './public/public.module';
 import { SessionsModule } from './sessions/sessions.module';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
       envFilePath: ['.env', '../../.env']
     }),
     PrismaModule,
+    ObservabilityModule,
     UsersModule,
     LockersModule,
     SessionsModule,

@@ -2,7 +2,7 @@
 
 This document describes the VPS deployment strategy for `locker-mvp`.
 
-The repository has completed Stage 11: simple balance and locker pricing. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
+The repository has completed Stage 12: production-oriented MVP observability. The NestJS backend exists under `backend/api`, the user-facing React + Vite Telegram MiniApp exists under `apps/tma`, the React + Vite admin frontend exists under `apps/admin`, the React + Vite public display frontend exists under `apps/display`, Docker Compose/Nginx deployment files exist under `infra`, and helper scripts exist under `scripts`.
 
 ## VPS Assumptions
 
@@ -58,6 +58,8 @@ Expected local URLs:
 
 ```txt
 http://localhost/api/health
+http://localhost/api/health/db
+http://localhost/api/metrics
 http://localhost/tma
 http://localhost/admin
 http://localhost/display
@@ -73,6 +75,22 @@ View logs:
 
 ```sh
 docker compose --env-file .env -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h api
+docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
+docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
+docker compose --env-file .env -f infra/docker-compose.yml logs -f tma
+docker compose --env-file .env -f infra/docker-compose.yml logs -f admin
+docker compose --env-file .env -f infra/docker-compose.yml logs -f display
+```
+
+View health and metrics:
+
+```sh
+curl http://localhost/api/health
+curl http://localhost/api/health/db
+curl http://localhost/api/metrics
 ```
 
 Run migrations manually:
@@ -121,7 +139,7 @@ infra/docker-compose.yml
 Service details:
 
 - `postgres`: `postgres:16-alpine`, persistent `postgres_data` volume, `pg_isready` health check.
-- `api`: builds `backend/api/Dockerfile`, reads `.env`, waits for healthy PostgreSQL, runs `prisma migrate deploy`, then starts the compiled NestJS entrypoint with `npm run start` on container port `3000`.
+- `api`: builds `backend/api/Dockerfile`, reads `.env`, waits for healthy PostgreSQL, runs `prisma migrate deploy`, then starts the compiled NestJS entrypoint with `npm run start` on container port `3000`. Its health check calls `GET /api/health/db` so the container reports unhealthy if the API cannot reach PostgreSQL.
 - `tma`: builds `apps/tma/Dockerfile` and serves the built Vite app under `/tma/`.
 - `admin`: builds `apps/admin/Dockerfile` and serves the built Vite app under `/admin/`.
 - `display`: builds `apps/display/Dockerfile` and serves the built Vite app under `/display/`.
@@ -229,6 +247,16 @@ Stage 11 deployment impact:
 - Simple fixed pricing and balance deduction are backend business logic only.
 - No new environment variables, Docker services, Nginx routes, payment provider credentials, invoice services, queues, or external managed services were introduced.
 - Existing users keep their current balance until manually edited in PostgreSQL.
+
+Stage 12 observability deployment impact:
+
+- Observability stays Docker Compose compatible and uses container stdout/stderr as the primary log stream.
+- Docker Compose logs remain the default operational workflow.
+- `GET /api/health` provides API liveness.
+- `GET /api/health/db` verifies Prisma/PostgreSQL connectivity and is used by the Docker `api` health check.
+- `GET /api/metrics` exposes lightweight Prometheus-compatible text metrics from the API process and PostgreSQL counts.
+- No paid external observability service, Kubernetes, message queue, large logging platform, Prometheus service, Grafana service, database table, or new Nginx route was introduced.
+- Stage 12 added no new environment variables.
 
 ## Telegram MiniApp Build Notes
 
@@ -347,14 +375,25 @@ Log commands:
 # all services
 docker compose --env-file .env -f infra/docker-compose.yml logs -f
 
+# all services, recent logs only
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h
+
 # API only
 docker compose --env-file .env -f infra/docker-compose.yml logs -f api
+
+# API only, recent logs only
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h api
 
 # Nginx only
 docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
 
 # PostgreSQL only
 docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
+
+# frontend app containers
+docker compose --env-file .env -f infra/docker-compose.yml logs -f tma
+docker compose --env-file .env -f infra/docker-compose.yml logs -f admin
+docker compose --env-file .env -f infra/docker-compose.yml logs -f display
 ```
 
 Restart commands:
@@ -371,6 +410,47 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d --build
 ```
 
 The `api` service also runs `prisma migrate deploy` automatically on container start.
+
+## Observability Operations
+
+Stage 12 makes production debugging possible with the existing Docker Compose deployment.
+
+Logging behavior:
+
+- API logs are structured JSON and emitted to stdout/stderr.
+- Request logs include method, route/path, status code, latency, request id, and safe actor context.
+- Response logs summarize status and timing, not full response bodies.
+- Error logs include safe context and stack traces where useful.
+- Audit-relevant events cover admin login success/failure, admin locker status changes, TMA auth success/failure, auth guard failures, public API failures, storage session starts, failed starts, insufficient balance attempts, locker assignment, session finish, locker release, and balance deduction.
+
+Metrics behavior:
+
+- Lightweight in-process metrics are owned by the API.
+- `GET /api/metrics` returns Prometheus-compatible text.
+- Metrics track total lockers, available lockers, occupied lockers, maintenance lockers, active sessions, completed sessions, failed start attempts, insufficient balance attempts, auth failures, API requests, API errors, request duration sums/counts, and process uptime.
+- Do not add Prometheus, Grafana, or another platform as a required MVP service unless a later scope change explicitly approves it.
+
+Health check behavior:
+
+- `GET /api/health` is the basic API liveness check.
+- `GET /api/health/db` is the database-aware health check.
+- Docker Compose uses `/api/health/db` for the API service health check.
+
+Security and privacy rules:
+
+- Never log `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `TMA_JWT_SECRET`, raw Telegram `initData`, `Authorization` headers, passwords, database passwords, full JWTs, or full database connection strings.
+- Redact sensitive request headers and request body fields before logging.
+- Auth logs should record safe outcomes such as success/failure and actor type, not credentials.
+- Database error logs should avoid printing connection URLs with credentials.
+
+Stage 12 verification should include:
+
+- Start the stack with Docker Compose.
+- Call `GET /api/health`, `GET /api/health/db`, and `GET /api/metrics`.
+- Trigger representative admin, TMA, public, session-start, insufficient-balance, and session-finish flows.
+- Confirm `docker compose --env-file .env -f infra/docker-compose.yml logs api` shows structured events.
+- Confirm sensitive values are absent from logs.
+- Confirm the metrics endpoint returns expected counters and gauges.
 
 ## Backup Notes
 

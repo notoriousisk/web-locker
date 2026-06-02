@@ -8,6 +8,8 @@ import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { Prisma } from '@prisma/client';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { optionalString, requireNonEmptyString } from '../common/validation';
+import { MetricsService } from '../observability/metrics.service';
+import { ObservabilityLogger } from '../observability/observability-logger.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TmaLoginDto } from './dto/tma-login.dto';
 import { TmaJwtPayload } from './tma-auth.types';
@@ -31,14 +33,30 @@ export class TmaAuthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly jwtService: JwtService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
+    private readonly logger: ObservabilityLogger,
+    private readonly metrics: MetricsService
   ) {}
 
   async login(dto: TmaLoginDto) {
     const initData = optionalString(dto.initData);
-    const telegramUser = initData
-      ? this.validateTelegramInitData(initData)
-      : this.getDevelopmentUser();
+    let telegramUser: ValidatedTelegramUser;
+
+    try {
+      telegramUser = initData
+        ? this.validateTelegramInitData(initData)
+        : this.getDevelopmentUser();
+    } catch (error) {
+      this.metrics.increment('locker_auth_failures_total', {
+        actorType: 'tma-user',
+        reason: 'invalid_init_data'
+      });
+      this.logger.warn('tma_login_failure', {
+        actorType: 'tma-user',
+        reason: error instanceof Error ? error.message : 'invalid_init_data'
+      });
+      throw error;
+    }
 
     const user = await this.prisma.user.upsert({
       where: { telegramId: telegramUser.telegramId },
@@ -67,12 +85,21 @@ export class TmaAuthService {
       expiresIn: this.getTokenExpiresIn() as JwtSignOptions['expiresIn']
     };
 
-    return {
+    const response = {
       accessToken: await this.jwtService.signAsync(payload, tokenOptions),
       tokenType: 'Bearer',
       expiresIn: this.getTokenExpiresIn(),
       user
     };
+
+    this.logger.info('tma_login_success', {
+      actorType: 'tma-user',
+      actorId: user.id,
+      telegramId: user.telegramId,
+      devAuth: !initData
+    });
+
+    return response;
   }
 
   getJwtSecret() {
