@@ -1,586 +1,198 @@
-# locker-mvp
+# Электронная камера хранения багажа
 
-`locker-mvp` is an MVP for an electronic luggage locker system. Users interact with the system through a Telegram MiniApp, administrators manage lockers and sessions through a web panel, and a public display page shows locker availability.
+MVP сервиса электронной камеры хранения багажа.
 
-This repository has completed Stage 12: production-oriented MVP observability. The NestJS backend exists under `backend/api`, the user-facing Telegram MiniApp exists under `apps/tma`, the React + Vite + TypeScript admin frontend exists under `apps/admin`, the public display frontend exists under `apps/display`, Docker Compose deployment files exist under `infra`, and helper scripts exist under `scripts`.
+Проект состоит из Telegram MiniApp для пользователей, админ-панели,
+публичного экрана доступности ячеек и NestJS API с PostgreSQL.
+Бизнес-логика хранится на backend: авторизация Telegram, подбор ячейки,
+старт и завершение хранения, списание фиксированной цены с баланса.
 
-## MVP Scope
+## Контрибьюторы
 
-The MVP will include:
+- Ишкинеев Искандер
+- Хазипов Альберт
+- Зорин Никита
 
-- Telegram MiniApp for users.
-- Admin web panel.
-- Public locker display page.
-- Backend API.
-- PostgreSQL database.
-- Prisma schema, migrations, and seed data.
-- Docker Compose deployment.
-- Nginx routing.
-- Backend-validated Telegram MiniApp `initData` authentication.
-- Simple fixed locker pricing and balance deduction.
-- Production-oriented MVP observability through structured logs, basic health checks, Docker Compose logs, and lightweight metrics.
-- Mandatory documentation.
+## Current VPS Deployment
 
-The MVP will not include:
+The project is currently deployed on a VPS and served over HTTP through Docker Compose and Nginx.
 
-- Real payments.
-- Payment providers.
-- Invoices.
-- Refunds.
-- Transaction history.
-- Physical locker integration.
-- WebSockets unless explicitly approved later.
-- Complex analytics.
-- Large observability platforms.
-- Multiple locker locations.
-- QR codes.
-- 3D visualization.
-- Real baggage dimension input.
-
-## Project Structure
+Public links:
 
 ```txt
-./
-├── apps/
-│   ├── tma/
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── vite.config.ts
-│   ├── admin/
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── vite.config.ts
-│   └── display/
-│       ├── src/
-│       ├── package.json
-│       └── vite.config.ts
-├── backend/
-│   └── api/
-│       ├── Dockerfile
-│       ├── prisma/
-│       │   ├── migrations/
-│       │   ├── schema.prisma
-│       │   └── seed.ts
-│       ├── src/
-│       ├── package.json
-│       └── prisma.config.ts
-├── infra/
-│   ├── docker-compose.yml
-│   └── nginx/
-│       └── nginx.conf
-├── scripts/
-│   ├── start-dev.sh
-│   └── stop-dev.sh
-├── docs/
-│   ├── architecture.md
-│   ├── deployment.md
-│   └── implementation-plan.md
-├── README.md
-├── AGENTS.md
-└── .env.example
+http://157.22.199.163/display/
+http://157.22.199.163/admin/
 ```
 
-Planned responsibilities:
+The Telegram MiniApp is tested through the Telegram Test Server Environment bot because Telegram's main production environment accepts only HTTPS MiniApp URLs.
 
-- `apps/tma`: React + Vite Telegram MiniApp frontend.
-- `apps/admin`: React + Vite admin web panel frontend.
-- `apps/display`: React + Vite public locker display frontend.
-- `backend/api`: NestJS backend API with Prisma schema, initial migration, and seed data.
-- `infra`: Docker Compose and Nginx deployment files.
-- `scripts`: simple Docker Compose start/stop helpers.
-- `docs`: architecture, deployment, and implementation planning documents.
+## Web Locker
 
-## Implementation Plan
+Electronic luggage locker MVP with a Telegram MiniApp, admin panel, public availability display, NestJS API, PostgreSQL, Docker Compose, and Nginx routing.
 
-The full MVP implementation plan is maintained in [docs/implementation-plan.md](docs/implementation-plan.md).
+The project is intentionally small: one backend owns the business rules, three thin frontend apps call the API, and Docker Compose is the deployment path.
 
-Future agents must update `docs/implementation-plan.md` whenever implementation stages, scope, priorities, assumptions, or MVP boundaries change.
+## What Is Included
 
-## Planned Local Development Flow
+- Telegram MiniApp for users: profile, balance, active sessions, history, start storage, finish storage.
+- Admin panel: login, dashboard, lockers, users, active/history sessions.
+- Public display: read-only locker grid with polling.
+- Backend API: Telegram `initData` auth, admin JWT auth, locker assignment, fixed pricing, session lifecycle, health checks, metrics, structured logs.
+- PostgreSQL persistence through Prisma migrations and deterministic seed data.
+- Docker Compose services for the API, database, frontends, and Nginx.
 
-Local backend development currently happens from `backend/api`.
+Not included unless explicitly added later: real payments, refunds, invoices, transaction history, physical locker integration, QR codes, WebSockets, multiple locations, complex analytics, Kubernetes, queues, or external managed services.
 
-Backend setup:
+## Stack
+
+- Frontend: React + Vite + TypeScript.
+- Backend: NestJS + TypeScript.
+- Database: PostgreSQL.
+- ORM: Prisma.
+- Deployment: Docker Compose.
+- Reverse proxy: Nginx.
+
+## Repository Layout
+
+```txt
+apps/
+  tma/       Telegram MiniApp
+  admin/     Admin panel
+  display/   Public display
+backend/
+  api/       NestJS API, Prisma schema, migrations, seed
+infra/
+  docker-compose.yml
+  nginx/nginx.conf
+scripts/
+  start-dev.sh
+  stop-dev.sh
+docs/
+  architecture.md
+  deployment.md
+  implementation-plan.md
+```
+
+## Quick Start
+
+Create an environment file:
 
 ```sh
-# from repository root
-cd backend/api
-npm install
-
-# generate Prisma client
-npm run prisma:generate
-
-# run the API in watch mode
-npm run start:dev
+cp .env.example .env
 ```
 
-The backend reads environment variables from `backend/api/.env` or the repository-root `.env`.
-
-The backend exposes basic liveness, database readiness, and metrics endpoints:
+Edit `.env` before production use. At minimum, replace:
 
 ```txt
-GET /api/health
-GET /api/health/db
-GET /api/metrics
+POSTGRES_PASSWORD
+ADMIN_PASSWORD
+JWT_SECRET
+TELEGRAM_BOT_TOKEN
+TMA_JWT_SECRET
 ```
 
-Current backend API endpoints:
-
-```txt
-POST /api/tma/auth/login
-GET  /api/tma/me
-GET  /api/tma/me/sessions/active
-GET  /api/tma/me/sessions/history
-POST /api/tma/sessions
-POST /api/tma/sessions/:id/finish
-
-GET  /api/lockers
-
-GET  /api/public/lockers
-GET  /api/public/stats
-
-GET  /api/health
-GET  /api/health/db
-GET  /api/metrics
-
-POST /api/admin/auth/login
-GET  /api/admin/auth/me
-GET  /api/admin/dashboard
-GET  /api/admin/users
-GET  /api/admin/lockers
-PATCH /api/admin/lockers/:id/status
-GET  /api/admin/sessions
-GET  /api/admin/sessions/active
-GET  /api/admin/sessions/history
-```
-
-The TMA, Stage 3, and Stage 4 endpoints use the real PostgreSQL database through Prisma. There is no in-memory storage or mock data in the core flows.
-
-Telegram MiniApp frontend:
+Start the full stack:
 
 ```sh
-# from repository root
-cd apps/tma
-npm install
-npm run dev
-
-# production build
-npm run build
+./scripts/start-dev.sh
 ```
 
-In local development, the TMA Vite dev server proxies `/api` to `http://localhost:3000`.
-
-The TMA reads its API base URL from:
-
-```txt
-VITE_TMA_API_BASE_URL=/api
-VITE_TMA_BASE_PATH=/tma/
-```
-
-If `VITE_TMA_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_TMA_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/tma/`.
-
-When opened inside Telegram, the TMA sends raw `window.Telegram.WebApp.initData` to `POST /api/tma/auth/login`. The backend validates the signature and `auth_date`, creates or updates the user, and returns a short-lived TMA JWT. The TMA stores that token in React memory only and sends it as `Authorization: Bearer <tma-token>` to user and session APIs.
-
-Normal browser development has no Telegram `initData`. To use the local demo identity, set `TMA_DEV_AUTH_ENABLED=true` in the backend environment and configure the `TMA_DEV_*` identity variables. Keep `TMA_DEV_AUTH_ENABLED=false` in production.
-
-Admin frontend flow:
+That runs:
 
 ```sh
-# from repository root
-cd apps/admin
-npm install
-npm run dev
-
-# production build
-npm run build
+docker compose --env-file .env -f infra/docker-compose.yml up --build
 ```
 
-In local development, the admin Vite dev server proxies `/api` to `http://localhost:3000`.
-
-The admin frontend reads its API base URL from:
-
-```txt
-VITE_ADMIN_API_BASE_URL=/api
-VITE_ADMIN_BASE_PATH=/admin/
-```
-
-If `VITE_ADMIN_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_ADMIN_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/admin/`.
-
-Public display frontend:
+Stop and remove the stack:
 
 ```sh
-# from repository root
-cd apps/display
-npm install
-npm run dev
-
-# production build
-npm run build
+./scripts/stop-dev.sh
 ```
 
-In local development, the display Vite dev server proxies `/api` to `http://localhost:3000`.
-
-The display frontend reads its API base URL from:
+## Local URLs
 
 ```txt
-VITE_DISPLAY_API_BASE_URL=/api
-VITE_DISPLAY_BASE_PATH=/display/
+http://localhost/tma
+http://localhost/admin
+http://localhost/display
+http://localhost/api/health
+http://localhost/api/health/db
+http://localhost/api/metrics
 ```
 
-If `VITE_DISPLAY_API_BASE_URL` is not set, the app defaults to `/api`. If `VITE_DISPLAY_BASE_PATH` is not set, local builds default to `/`; the Docker build passes `/display/`.
+Production routing is expected to use the same paths:
 
-## Backend Database Commands
+```txt
+/tma      Telegram MiniApp
+/admin    Admin panel
+/display  Public display
+/api      Backend API
+```
 
-These commands require `DATABASE_URL` to point at a running PostgreSQL database:
+The current Compose setup serves HTTP. Use a VPS-level proxy or a documented Nginx TLS update for HTTPS.
+
+## Docker Services
+
+```txt
+postgres  PostgreSQL database with persistent volume
+api       NestJS backend; runs Prisma migrations on startup
+tma       Built Telegram MiniApp served by Nginx
+admin     Built admin panel served by Nginx
+display   Built public display served by Nginx
+nginx     Public reverse proxy
+```
+
+Useful Compose commands:
 
 ```sh
-cd backend/api
-
-# apply migrations in development
-npm run prisma:migrate:dev
-
-# apply existing migrations in deployment-like environments
-npm run prisma:migrate:deploy
-
-# seed deterministic test lockers
-npm run db:seed
+docker compose --env-file .env -f infra/docker-compose.yml up -d --build
+docker compose --env-file .env -f infra/docker-compose.yml down
+docker compose --env-file .env -f infra/docker-compose.yml restart
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs -f api
 ```
 
-The initial seed creates these lockers:
+## Database
+
+The API uses Prisma with PostgreSQL. Schema changes must use migrations.
+
+Run migrations inside Docker:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
+```
+
+Seed demo lockers:
+
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
+```
+
+Current seed lockers:
 
 ```txt
 A01 S   A02 S   A03 M   A04 M
 B01 L   B02 L   B03 XL  B04 XL
 ```
 
-## Backend API Examples
-
-Authenticate a Telegram MiniApp user:
+For backend-only local work:
 
 ```sh
-curl -X POST http://localhost:3000/api/tma/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"initData":"<raw-window.Telegram.WebApp.initData>"}'
+cd backend/api
+npm install
+npm run prisma:generate
+npm run start:dev
 ```
 
-Start a storage session:
+`DATABASE_URL` must point to a running PostgreSQL instance.
 
-```sh
-curl -X POST http://localhost:3000/api/tma/sessions \
-  -H 'Authorization: Bearer <tma-token>' \
-  -H 'Content-Type: application/json' \
-  -d '{"requestedSize":"M"}'
-```
+## Environment
 
-Finish a storage session:
+All variables are listed in [.env.example](.env.example). Do not commit real `.env` files.
 
-```sh
-curl -X POST http://localhost:3000/api/tma/sessions/<session-id>/finish \
-  -H 'Authorization: Bearer <tma-token>'
-```
-
-Read public locker data:
-
-```sh
-curl http://localhost:3000/api/public/lockers
-curl http://localhost:3000/api/public/stats
-```
-
-Admin login and protected admin calls:
-
-```sh
-curl -X POST http://localhost:3000/api/admin/auth/login \
-  -H 'Content-Type: application/json' \
-  -d '{"login":"admin","password":"change-me"}'
-
-curl http://localhost:3000/api/admin/dashboard \
-  -H 'Authorization: Bearer <access-token>'
-
-curl http://localhost:3000/api/admin/users \
-  -H 'Authorization: Bearer <access-token>'
-
-curl http://localhost:3000/api/admin/sessions/active \
-  -H 'Authorization: Bearer <access-token>'
-
-curl -X PATCH http://localhost:3000/api/admin/lockers/<locker-id>/status \
-  -H 'Authorization: Bearer <access-token>' \
-  -H 'Content-Type: application/json' \
-  -d '{"status":"MAINTENANCE"}'
-```
-
-Admin locker status changes only allow `AVAILABLE` and `MAINTENANCE`. `OCCUPIED` lockers cannot be changed manually; they are released by finishing active storage sessions.
-
-## Admin Frontend Notes
-
-The Stage 6 admin frontend implements:
-
-- admin login;
-- JWT storage in `localStorage` for MVP;
-- dashboard stats;
-- lockers management;
-- users table;
-- sessions table with active, history, and all views;
-- locker status changes between `AVAILABLE` and `MAINTENANCE`;
-- backend error display.
-
-The admin frontend does not allow manually setting lockers to `OCCUPIED`.
-
-## Public Display Notes
-
-The Stage 7 public display frontend implements:
-
-- unauthenticated read-only locker grid;
-- locker code, size, and status display;
-- public stats summary;
-- clear visual states for `AVAILABLE`, `OCCUPIED`, and `MAINTENANCE`;
-- polling every 5 seconds through the public backend API.
-
-The display frontend does not include admin controls, QR codes, WebSockets, payments, Docker, or Nginx implementation.
-
-## Telegram MiniApp Notes
-
-The Stage 5 Telegram MiniApp implements the user-facing MVP flow:
-
-- profile and balance display;
-- active sessions;
-- history sessions;
-- start storage with `S`, `M`, `L`, or `XL`;
-- assigned locker confirmation;
-- finish storage action.
-
-The Stage 10 Telegram MiniApp sends raw `window.Telegram.WebApp.initData` to the backend on load. It does not authenticate with `initDataUnsafe`, editable `telegramId`, query parameters, or request-body identity fields.
-
-## Stage 10: Full Telegram MiniApp Integration
-
-Stage 10 replaces the placeholder TMA identity flow with Telegram MiniApp authentication based on backend-validated `initData`.
-
-Implemented flow:
-
-1. The TMA reads the raw `window.Telegram.WebApp.initData` string when opened inside Telegram.
-2. The TMA sends that raw `initData` to the backend.
-3. The backend validates `initData` cryptographically using the Telegram bot token.
-4. The backend creates or updates the user only after validation succeeds.
-5. The backend returns a short-lived TMA JWT containing the internal `userId`, Telegram identity, and `scope: "tma"`.
-6. The TMA sends that token as `Authorization: Bearer <token>` to user/session APIs.
-7. The backend stops trusting client-supplied `telegramId` and never uses `initDataUnsafe` for authentication.
-
-Acceptance criteria:
-
-- Invalid, missing, stale, or tampered `initData` is rejected in production mode.
-- `initDataUnsafe` may be used only for non-security UI display hints, not for authentication.
-- The editable demo `telegramId` is removed from production and allowed only behind an explicit local development mode.
-- Documentation explains how local development works when Telegram `initData` is unavailable.
-- Security assumptions and limitations are documented before implementation is considered complete.
-
-Security and local development notes:
-
-- The Telegram bot token stays backend-only.
-- The TMA JWT should be short-lived and scoped to TMA user APIs.
-- The TMA keeps the token in memory and re-authenticates from Telegram `initData` on app load.
-- Local browser development without Telegram `initData` uses only the explicit backend `TMA_DEV_AUTH_ENABLED=true` demo mode.
-- Telegram `auth_date` must be no older than `TMA_INIT_DATA_MAX_AGE_SECONDS`, defaulting to 86400 seconds.
-
-Deployment impact:
-
-- Stage 10 adds backend-only `TELEGRAM_BOT_TOKEN` and `TMA_JWT_SECRET`.
-- `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, and `TMA_DEV_*` variables configure token lifetime, stale `initData` rejection, and explicit local demo authentication.
-
-## Stage 11: Simple Balance and Locker Pricing
-
-Stage 11 adds simple MVP balance and pricing rules without adding real payments.
-
-Rules:
-
-- New users start with balance `1000`.
-- Fixed locker prices are `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
-- Price is based on the assigned locker size, not the requested luggage size.
-- Example: if a user requests `M` but the backend assigns an `L` locker, the cost is `10`.
-- Before storage starts, the backend checks that the user has enough balance for the assigned locker.
-- If balance is insufficient, storage does not start and no locker becomes `OCCUPIED`.
-- When storage is finished, the backend deducts the assigned locker price in the same transaction that completes the session and releases the locker.
-- Admins may still manually edit `User.balance` directly in PostgreSQL for MVP testing.
-
-MVP exclusions for Stage 11:
-
-- No payment providers.
-- No invoices.
-- No refunds.
-- No transaction history unless explicitly approved later.
-- No payment transaction tables by default.
-
-Implementation notes:
-
-- Existing users keep their current balance until edited manually in the database.
-- No payment providers, invoices, refunds, payment entities, or transaction history were added.
-
-## Stage 12: Observability
-
-Stage 12 is implemented. It adds production-oriented MVP observability while staying Docker Compose compatible and avoiding paid external services.
-
-Implemented behavior:
-
-- Backend API logs are structured JSON written to stdout/stderr for `docker compose logs`.
-- Every API request emits an `api_request` event with request id, method, route/path, status code, latency, and safe actor context.
-- Unhandled and HTTP errors emit `api_error` events with safe context and stack traces where useful.
-- Audit-relevant events are logged for admin login success/failure, admin JWT failures, admin locker status changes, TMA login success/failure, TMA JWT failures, public API failures, locker assignment, storage session start success/failure, insufficient balance attempts, no-locker-available attempts, finish success/failure, and balance deduction.
-- `GET /api/health` remains a lightweight API process liveness endpoint.
-- `GET /api/health/db` verifies that Prisma can reach PostgreSQL and is used by the Docker `api` health check.
-- `GET /api/metrics` exposes lightweight Prometheus-compatible text metrics from the API process and PostgreSQL state.
-- Metrics include API request counters, request duration sums/counts, error counters, process uptime, locker gauges, session gauges, auth failure counters, failed start counters, and insufficient balance counters.
-- No observability dependencies, Docker services, Nginx routes, database tables, or external platforms were added.
-
-Security and privacy rules:
-
-- Never log `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `TMA_JWT_SECRET`, raw Telegram `initData`, `Authorization` headers, passwords, database passwords, full JWTs, or full database connection strings.
-- Prefer internal user ids, Telegram ids where useful for TMA support, locker ids/codes, session ids, route names, status codes, and event names.
-- Request logging does not log request bodies or response bodies by default. Shared log redaction also redacts sensitive key names if they are passed to the logger.
-- Keep observability local to Docker Compose for MVP. Do not add Kubernetes, paid external observability services, distributed tracing, or complex log pipelines unless explicitly approved later.
-
-## How To Start The Whole Project
-
-The full MVP runs through Docker Compose. The VPS and local Docker flow are the same.
-
-First create a local `.env` from placeholders:
-
-```sh
-cp .env.example .env
-```
-
-Edit `.env` before production use. At minimum, replace `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `JWT_SECRET`, `TELEGRAM_BOT_TOKEN`, and `TMA_JWT_SECRET`.
-
-Start the full stack with attached logs:
-
-```sh
-./scripts/start-dev.sh
-```
-
-This runs:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml up --build
-```
-
-Press `Ctrl+C` to stop the attached Compose run. To stop and remove the stack from another terminal:
-
-```sh
-./scripts/stop-dev.sh
-```
-
-Browser URLs after startup:
+Core backend variables:
 
 ```txt
-http://localhost/api/health
-http://localhost/api/health/db
-http://localhost/api/metrics
-http://localhost/tma
-http://localhost/admin
-http://localhost/display
-```
-
-Apply migrations manually if needed:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
-```
-
-The `api` container also runs `prisma migrate deploy` automatically on startup.
-
-Seed deterministic demo lockers:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
-```
-
-View logs:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml logs -f
-docker compose --env-file .env -f infra/docker-compose.yml logs -f api
-docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h api
-docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
-docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
-docker compose --env-file .env -f infra/docker-compose.yml logs -f tma
-docker compose --env-file .env -f infra/docker-compose.yml logs -f admin
-docker compose --env-file .env -f infra/docker-compose.yml logs -f display
-```
-
-View health and metrics:
-
-```sh
-curl http://localhost/api/health
-curl http://localhost/api/health/db
-curl http://localhost/api/metrics
-```
-
-Restart all services:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml restart
-```
-
-## Docker Compose Deployment Flow
-
-Docker Compose is the required deployment path for the MVP. The services are:
-
-- `postgres`
-- `api`
-- `tma`
-- `admin`
-- `display`
-- `nginx`
-
-Deployment flow:
-
-```sh
-cp .env.example .env
-# edit .env with environment-specific values
-docker compose --env-file .env -f infra/docker-compose.yml up -d --build
-```
-
-The `api` container runs `prisma migrate deploy` before starting the NestJS server. Seed data is applied separately when needed:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
-```
-
-Stop services with:
-
-```sh
-docker compose --env-file .env -f infra/docker-compose.yml down
-```
-
-## Planned VPS Deployment Flow
-
-The VPS should only require:
-
-- Docker.
-- Docker Compose.
-- Git.
-- Environment variables in `.env`.
-
-Planned production routes:
-
-```txt
-https://example.com/tma      -> Telegram MiniApp frontend
-https://example.com/admin    -> Admin panel frontend
-https://example.com/display  -> Public display frontend
-https://example.com/api      -> Backend API
-```
-
-Do not assume Node.js is manually installed on the VPS. Application builds and runtime must happen through Docker images.
-
-See [docs/deployment.md](docs/deployment.md) for the deployment strategy.
-
-## Required Environment Variables
-
-Variables are listed in [.env.example](.env.example).
-
-Required variables:
-
-```txt
-POSTGRES_DB
-POSTGRES_USER
-POSTGRES_PASSWORD
 DATABASE_URL
 API_PORT
 ADMIN_LOGIN
@@ -595,74 +207,141 @@ TMA_DEV_TELEGRAM_ID
 TMA_DEV_USERNAME
 TMA_DEV_FIRST_NAME
 TMA_DEV_LAST_NAME
-TMA_PUBLIC_API_BASE_URL
-VITE_TMA_API_BASE_URL
-VITE_TMA_BASE_PATH
-ADMIN_PUBLIC_API_BASE_URL
-VITE_ADMIN_API_BASE_URL
-VITE_ADMIN_BASE_PATH
-DISPLAY_PUBLIC_API_BASE_URL
-VITE_DISPLAY_API_BASE_URL
-VITE_DISPLAY_BASE_PATH
+```
+
+Frontend routing variables:
+
+```txt
+VITE_TMA_API_BASE_URL=/api
+VITE_TMA_BASE_PATH=/tma/
+VITE_ADMIN_API_BASE_URL=/api
+VITE_ADMIN_BASE_PATH=/admin/
+VITE_DISPLAY_API_BASE_URL=/api
+VITE_DISPLAY_BASE_PATH=/display/
+```
+
+Deployment variables:
+
+```txt
+POSTGRES_DB
+POSTGRES_USER
+POSTGRES_PASSWORD
 NGINX_HTTP_PORT
 NGINX_HTTPS_PORT
 PUBLIC_DOMAIN
 ```
 
-Never commit real secrets. `.env.example` must contain placeholders only.
+Keep `TELEGRAM_BOT_TOKEN`, `JWT_SECRET`, `TMA_JWT_SECRET`, passwords, JWTs, Telegram `initData`, authorization headers, and database URLs out of logs and frontend builds.
 
-In Docker Compose, `API_PORT` should remain `3000` because Nginx routes to the API container on that port. Use `NGINX_HTTP_PORT` to change the host-facing HTTP port.
+## Auth Notes
 
-`NGINX_HTTPS_PORT` is reserved for a later direct-TLS Nginx setup. The current Compose file publishes HTTP only; terminate HTTPS with a VPS-level proxy or add and document TLS support later.
+The Telegram MiniApp authenticates by sending raw `window.Telegram.WebApp.initData` to:
 
-## Useful Commands
+```txt
+POST /api/tma/auth/login
+```
 
-Useful local and deployment commands:
+The backend validates the Telegram signature with `TELEGRAM_BOT_TOKEN`, checks freshness through `TMA_INIT_DATA_MAX_AGE_SECONDS`, creates or updates the user, and returns a short-lived TMA JWT. User/session routes require that TMA JWT.
+
+Local browser development often has no Telegram `initData`. Use `TMA_DEV_AUTH_ENABLED=true` only for local development, with the `TMA_DEV_*` identity variables. Keep it disabled in production.
+
+Admin authentication is MVP-only and uses `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET`.
+
+## Business Rules
+
+Locker selection uses the requested luggage size:
+
+```txt
+S  -> S, M, L, XL
+M  -> M, L, XL
+L  -> L, XL
+XL -> XL
+```
+
+The backend assigns the smallest available suitable locker.
+
+Fixed prices:
+
+```txt
+S  = 5
+M  = 7
+L  = 10
+XL = 15
+```
+
+Price is based on the assigned locker size. A user requesting `M` but receiving an `L` locker pays `10`.
+
+Starting storage checks balance before occupying a locker. Finishing storage completes the session, releases the locker, and deducts the assigned locker price in one transaction.
+
+## API Reference
+
+```txt
+POST /api/tma/auth/login
+GET  /api/tma/me
+GET  /api/tma/me/sessions/active
+GET  /api/tma/me/sessions/history
+POST /api/tma/sessions
+POST /api/tma/sessions/:id/finish
+
+GET  /api/public/lockers
+GET  /api/public/stats
+
+POST /api/admin/auth/login
+GET  /api/admin/auth/me
+GET  /api/admin/dashboard
+GET  /api/admin/users
+GET  /api/admin/lockers
+PATCH /api/admin/lockers/:id/status
+GET  /api/admin/sessions
+GET  /api/admin/sessions/active
+GET  /api/admin/sessions/history
+
+GET  /api/health
+GET  /api/health/db
+GET  /api/metrics
+```
+
+Admin locker status changes only allow `AVAILABLE` and `MAINTENANCE`. `OCCUPIED` lockers are released by finishing sessions, not by manual admin changes.
+
+## Operations
+
+Health and metrics:
 
 ```sh
-# backend only
-cd backend/api
-npm install
-npm run prisma:generate
-npm run build
-npm run lint
-
-# start all services through Docker Compose
-docker compose --env-file .env -f infra/docker-compose.yml up -d --build
-
-# stop all services
-docker compose --env-file .env -f infra/docker-compose.yml down
-
-# view logs
-docker compose --env-file .env -f infra/docker-compose.yml logs -f
-docker compose --env-file .env -f infra/docker-compose.yml logs -f api
-
-# view health and metrics
 curl http://localhost/api/health
 curl http://localhost/api/health/db
 curl http://localhost/api/metrics
-
-# run Prisma migrations
-docker compose --env-file .env -f infra/docker-compose.yml exec api npx prisma migrate deploy
-
-# seed test data
-docker compose --env-file .env -f infra/docker-compose.yml exec api npm run db:seed
 ```
 
-If any documented command fails, fix the command or update the documentation in the same change.
+Service logs:
 
-## Documentation Maintenance Rule
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml logs -f
+docker compose --env-file .env -f infra/docker-compose.yml logs --since 1h api
+docker compose --env-file .env -f infra/docker-compose.yml logs -f nginx
+docker compose --env-file .env -f infra/docker-compose.yml logs -f postgres
+docker compose --env-file .env -f infra/docker-compose.yml logs -f tma
+docker compose --env-file .env -f infra/docker-compose.yml logs -f admin
+docker compose --env-file .env -f infra/docker-compose.yml logs -f display
+```
 
-Documentation is mandatory project state.
+Backup:
 
-After every code change, configuration change, database schema change, Docker change, or deployment change, update the relevant documentation in the same work session.
+```sh
+docker compose --env-file .env -f infra/docker-compose.yml exec postgres pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > locker-mvp-backup.sql
+```
 
-At minimum, future changes may require updates to:
+Restore:
 
-- `README.md`
-- `AGENTS.md`
-- `docs/architecture.md`
-- `docs/deployment.md`
-- `docs/implementation-plan.md`
+```sh
+cat locker-mvp-backup.sql | docker compose --env-file .env -f infra/docker-compose.yml exec -T postgres psql -U "$POSTGRES_USER" "$POSTGRES_DB"
+```
 
-If documentation is not updated after a relevant change, the task is incomplete.
+Do not commit database backups.
+
+## More Detail
+
+- [Architecture](docs/architecture.md)
+- [Deployment](docs/deployment.md)
+- [Implementation plan](docs/implementation-plan.md)
+- [Agent rules](AGENTS.md)

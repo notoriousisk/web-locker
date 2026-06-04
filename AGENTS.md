@@ -1,18 +1,12 @@
 # AGENTS.md
 
-This file contains mandatory instructions for all future AI coding agents working on `locker-mvp`.
+Mandatory rules for future AI coding agents working on `locker-mvp`.
 
-The project is an MVP for an electronic luggage locker system with a Telegram MiniApp, admin panel, public display page, backend API, PostgreSQL database, Docker Compose deployment, and Nginx routing.
+## Project State
+The MVP includes production-oriented observability. Main paths: `backend/api` NestJS API, `apps/tma` Telegram MiniApp, `apps/admin` admin panel, `apps/display` public display, `infra` Docker/Nginx, and `docs` project docs.
 
-## Current Stage
-
-The repository has completed Stage 12: production-oriented MVP observability.
-
-The backend scaffold, Prisma schema, initial migration, seed script, users module, lockers module, storage sessions module with fixed MVP pricing, public read-only module, JWT-protected admin backend, TMA auth module, user-facing Telegram MiniApp frontend, admin frontend, public display frontend, Docker Compose deployment file, app Dockerfiles, Nginx routing config, simple start/stop helper scripts, structured backend logs, database health check, and lightweight metrics endpoint exist.
-
-## Mandatory Files to Read Before Editing
-
-Before making any code, configuration, schema, Docker, deployment, or documentation change, read:
+## Read Before Editing
+Before any code, configuration, schema, Docker, deployment, or documentation change, read:
 
 1. `README.md`
 2. `AGENTS.md`
@@ -20,409 +14,67 @@ Before making any code, configuration, schema, Docker, deployment, or documentat
 4. `docs/deployment.md`
 5. `docs/implementation-plan.md`
 
-If any of these files are missing, recreate or repair the missing documentation before continuing.
+If any are missing, repair the documentation before continuing.
 
-## Plan Before Coding
+## Working Rules
+- Check git status before editing.
+- Inspect relevant files and understand the current architecture first.
+- Keep changes small and aligned with the existing MVP.
+- Do not revert changes you did not make.
+- If a request is ambiguous, propose a plan before editing.
+- After implementation, config, schema, Docker, deployment, or behavior changes, update docs in the same task.
+- Docs: `README.md` for setup/env/commands/structure; `docs/architecture.md` for modules/flows/data; `docs/deployment.md` for Docker/Nginx/env/migrations/logs/backup; `docs/implementation-plan.md` for scope/priorities/assumptions; `AGENTS.md` for future-agent rules.
 
-Never start coding before understanding the current architecture and current implementation stage.
-
-Before substantial edits:
-
-1. Inspect the existing files.
-2. Identify the current implementation stage.
-3. Explain the planned change.
-4. Confirm which documentation files must be updated.
-
-If the requested change is ambiguous, propose a plan first instead of editing code.
-
-## Documentation Is Mandatory
-
-After every code change, configuration change, database schema change, Docker change, deployment change, or meaningful behavior change, update the relevant documentation in the same task.
-
-Documentation must never be treated as optional.
-
-Required documentation behavior:
-
-- Update `README.md` when commands, setup, environment variables, or project structure change.
-- Update `docs/architecture.md` when modules, flows, data model, or responsibilities change.
-- Update `docs/deployment.md` when Docker, Nginx, environment variables, migrations, seed process, logs, restart, backup, or restore steps change.
-- Update `docs/implementation-plan.md` when stages, scope, priorities, assumptions, acceptance criteria, or MVP boundaries change.
-- Update `AGENTS.md` when future-agent rules need to change.
-
-If you change implementation without updating relevant documentation, the task is incomplete.
-
-## Implementation Plan Maintenance
-
-`docs/implementation-plan.md` is a living project plan.
-
-Future agents must keep it current when:
-
-- A stage is started.
-- A stage is completed.
-- Stage order changes.
-- MVP scope changes.
-- Priorities change.
-- Acceptance criteria change.
-- Assumptions become false.
-- A feature is explicitly added to or removed from MVP scope.
-
-Do not let the implementation plan drift from the repository state.
-
-## MVP Architecture
-
-Use this architecture unless the user explicitly approves a different one:
-
+## Architecture
 - Frontend: React + Vite + TypeScript.
 - Backend: NestJS + TypeScript.
 - Database: PostgreSQL.
 - ORM: Prisma.
 - Deployment: Docker Compose.
 - Reverse proxy: Nginx.
+- Keep business logic in `backend/api`; keep frontends thin.
 
-Planned apps:
-
-- `apps/tma`: Telegram MiniApp for users.
-- `apps/admin`: admin web panel.
-- `apps/display`: public locker display.
-- `backend/api`: backend API.
-- `infra`: Docker Compose and Nginx files.
-
-Keep frontend apps thin. Business logic belongs in the backend API.
+Required production routes: `/tma`, `/admin`, `/display`, `/api`. Docker Compose services must remain stable: `postgres`, `api`, `tma`, `admin`, `display`, `nginx`.
 
 ## MVP Boundaries
+Allowed MVP scope: TMA profile/balance/sessions/history, start and finish storage, admin login/dashboard/users/lockers/sessions, admin locker maintenance status changes, public locker display, PostgreSQL persistence, Prisma migrations/seed, Docker Compose/Nginx deployment, Telegram `initData` auth, fixed balance pricing, structured logs, health checks, and `/api/metrics`.
 
-Build only the MVP described in the documentation unless the user explicitly expands scope.
+Do not add without explicit approval: real payments, payment providers, invoices, refunds, transaction history, physical locker integration, WebSockets, complex analytics, external observability platforms, multiple locations, QR codes, 3D views, real baggage dimensions, complex admin roles, CQRS/event sourcing, microservices, Kubernetes, queues, or external managed services required for the MVP.
 
-The MVP includes:
+## Core Business Rules
+- Locker suitability: `S -> S/M/L/XL`, `M -> M/L/XL`, `L -> L/XL`, `XL -> XL`.
+- Assign the smallest available suitable locker.
+- Start session transaction: find `AVAILABLE` locker, create `ACTIVE` session, mark locker `OCCUPIED`.
+- Finish session transaction: mark session `COMPLETED`, set `endedAt`, mark locker `AVAILABLE`, deduct balance.
+- Use Prisma/PostgreSQL for these flows; never replace them with in-memory or mock state.
+- New users start with balance `1000`.
+- Prices: `S = 5`, `M = 7`, `L = 10`, `XL = 15`.
+- Price is based on assigned locker size, not requested luggage size.
+- If balance is insufficient, do not create a session or occupy a locker.
 
-- User profile display in Telegram MiniApp.
-- User balance display.
-- Active storage sessions.
-- Storage history.
-- Starting a storage session by selecting size `S`, `M`, `L`, or `XL`.
-- Finishing a storage session and releasing the locker.
-- Admin locker list.
-- Admin locker status changes between `AVAILABLE` and `MAINTENANCE`.
-- Admin active sessions view.
-- Admin users view.
-- Basic admin dashboard stats.
-- Public locker display grid.
-- PostgreSQL persistence.
-- Prisma migrations and seed data.
-- Docker Compose deployment.
-- Nginx routing.
-- Full Telegram MiniApp authentication using backend-validated Telegram `initData`.
-- Simple fixed locker pricing and balance deduction.
-- Production-oriented MVP observability through structured logs, basic health checks, Docker Compose logs, and a lightweight metrics endpoint.
+## Auth, Env, and Secrets
+- TMA auth must use backend-validated raw Telegram `initData`; never trust `initDataUnsafe` for auth.
+- TMA APIs must derive identity from the TMA JWT.
+- Keep admin JWTs and TMA JWTs separate by secret and scope.
+- Local browser TMA auth is allowed only with explicit `TMA_DEV_AUTH_ENABLED=true`.
+- Never expose `TELEGRAM_BOT_TOKEN` through frontend `VITE_` variables.
+- Never commit real `.env` files or hardcode production secrets.
+- Keep `.env.example`, `README.md`, and `docs/deployment.md` aligned for env changes.
+- Never log secrets, raw Telegram `initData`, `Authorization` headers, passwords, full JWTs, database passwords, or full DB URLs.
 
-## Forbidden MVP Features
+## Admin and Frontend Rules
+- Admin auth is env-based; do not add `AdminUser` unless explicitly approved.
+- Admin locker status changes may only use `AVAILABLE` and `MAINTENANCE`.
+- Admin must not manually set `OCCUPIED` or change occupied lockers.
+- `apps/tma`, `apps/admin`, and `apps/display` must use backend APIs and their documented `VITE_*_API_BASE_URL` and base path variables.
+- Public display stays read-only, unauthenticated, and polling-based.
 
-Do not add these unless the user explicitly requests and approves a scope change:
-
-- Real payments.
-- Payment providers.
-- Invoices.
-- Refunds.
-- Transaction history.
-- Physical locker integration.
-- WebSockets.
-- Complex analytics.
-- Large observability platforms.
-- Multiple locker locations.
-- QR codes.
-- 3D visualization.
-- Real baggage dimension input.
-- Complex admin roles or permissions.
-- Complex event sourcing or CQRS.
-- Microservices.
-- Kubernetes.
-- Message queues.
-- External managed services required for core MVP operation.
-
-The `User.balance` field is used for simple fixed MVP pricing. It is displayed in the MiniApp and may still be edited manually in the database for MVP testing. Stage 11 keeps the MVP free of real payments while adding fixed prices and balance deduction.
-
-## Stage 10 Telegram MiniApp Authentication Rules
-
-Stage 10 is implemented.
-
-Rules for future changes:
-
-- The frontend must send the raw Telegram `initData` string to the backend.
-- The backend must validate `initData` cryptographically using the Telegram bot token before creating or updating a user.
-- The backend must not trust `initDataUnsafe` for authentication or authorization.
-- After successful validation, the backend issues a short-lived TMA JWT containing the internal `userId`, Telegram identity, and a TMA scope.
-- TMA user, balance, session, start-session, and finish-session APIs must require that TMA JWT and derive identity from it.
-- The TMA must prefer in-memory token storage and re-authenticate from Telegram `initData` on app load.
-- The editable demo `telegramId` is removed from production; local demo authentication is allowed only through explicit backend `TMA_DEV_AUTH_ENABLED=true`.
-- Local development behavior when Telegram `initData` is unavailable must be documented.
-- Security assumptions and limitations must be documented in `README.md`, `docs/architecture.md`, `docs/deployment.md`, and `docs/implementation-plan.md`.
-- Keep `TELEGRAM_BOT_TOKEN` backend-only and never expose it through frontend `VITE_` variables.
-- Keep admin JWTs and TMA JWTs separated by secret and token scope.
-- Stage 10 environment variables are `TELEGRAM_BOT_TOKEN`, `TMA_JWT_SECRET`, `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, `TMA_DEV_AUTH_ENABLED`, `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`.
-
-## Stage 11 Balance and Pricing Rules
-
-Stage 11 is implemented.
-
-Rules for future changes:
-
-- New users must start with balance `1000`.
-- Fixed locker prices are `S = 5`, `M = 7`, `L = 10`, and `XL = 15`.
-- Price must be based on the assigned locker size, not the requested luggage size.
-- If a user requests `M` but the backend assigns an `L` locker, the cost is `10`.
-- Before starting storage, the backend must check that the user has enough balance for the assigned locker size.
-- If balance is insufficient, storage must not start and no locker should become `OCCUPIED`.
-- When finishing storage, the backend must deduct the cost based on the assigned locker size.
-- The balance deduction must happen in the same transaction as completing the storage session and releasing the locker.
-- Do not add payment providers, invoices, refunds, or transaction history unless explicitly approved later.
-- Prefer not to add new entities for Stage 11; keep fixed MVP pricing simple unless a schema change is clearly justified and documented.
-- Admin can still manually edit balance directly in the database for MVP testing.
-- Existing users keep their current balance until manually edited in PostgreSQL.
-
-## Stage 12 Observability Rules
-
-Stage 12 is implemented.
-
-Rules for future changes:
-
-- Keep observability MVP-friendly and Docker Compose compatible.
-- Prefer structured backend logs written to stdout/stderr so `docker compose logs` remains the primary log viewer.
-- Keep request/response logs for API requests with method, route, status code, latency, request id, and safe actor context.
-- Log backend errors with safe context and useful stack traces, but never with secrets or sensitive request bodies.
-- Keep audit-relevant logs for admin, TMA, and public APIs, including admin login success/failure, admin locker status changes, TMA auth success/failure, protected route auth failures, public API failures, storage session lifecycle events, locker assignment, failed start attempts, and insufficient balance attempts.
-- Storage session logs should include safe ids such as `userId`, `sessionId`, `lockerId`, locker code, requested size, assigned size, price, and result when available.
-- Auth logs must never include raw Telegram `initData`, `Authorization` headers, JWTs, passwords, or secrets.
-- Metrics are lightweight in-process API counters plus DB-backed gauges exposed at `GET /api/metrics` in Prometheus text format. Do not add Prometheus, Grafana, or another platform unless explicitly approved later.
-- Useful business metrics include total lockers, available lockers, occupied lockers, maintenance lockers, active sessions, completed sessions, failed start attempts, insufficient balance attempts, and auth failures.
-- Health checks cover API liveness at `GET /api/health` and database connectivity at `GET /api/health/db`.
-- The Docker Compose `api` health check uses `GET /api/health/db`.
-- Deployment docs must include Docker Compose log commands for all services and service-specific logs.
-- Future agents changing observability must verify that logs are emitted, sensitive values are redacted, health checks work, and metrics return the expected counters/gauges.
-
-Never log:
-
-- `TELEGRAM_BOT_TOKEN`
-- `JWT_SECRET`
-- `TMA_JWT_SECRET`
-- raw Telegram `initData`
-- `Authorization` headers
-- passwords
-- database passwords
-- full JWTs
-- full database connection strings
-
-## Locker Selection Rules
-
-The backend must assign lockers based on requested luggage size:
-
-- `S` can use `S`, `M`, `L`, `XL`.
-- `M` can use `M`, `L`, `XL`.
-- `L` can use `L`, `XL`.
-- `XL` can use `XL`.
-
-The backend must always assign the smallest available suitable locker.
-
-Session creation must be transactional:
-
-1. Find the smallest suitable `AVAILABLE` locker.
-2. Create an `ACTIVE` storage session.
-3. Mark the locker as `OCCUPIED`.
-
-The implementation must use the real PostgreSQL database through `PrismaService`. Do not replace these flows with in-memory storage, static arrays, or mock data.
-
-Finishing a session must be transactional:
-
-1. Mark the session as `COMPLETED`.
-2. Set `endedAt`.
-3. Mark the locker as `AVAILABLE`.
-
-## Docker Compose Rules
-
-Docker Compose is the required deployment mechanism.
-
-Rules:
-
-- Do not bypass Docker Compose for VPS deployment.
-- Do not require manual Node.js installation on the VPS.
-- Do not require manual app builds on the VPS outside Docker.
-- Keep service names stable and documented.
-- Keep environment variables documented in `.env.example`, `README.md`, and `docs/deployment.md`.
-- Update `docs/deployment.md` after every Docker or Nginx change.
-- Keep production frontend base paths aligned with Nginx routes: `/tma/`, `/admin/`, and `/display/`.
-- Do not require manual migrations outside Docker for VPS deployment; use the `api` container.
-
-Services:
-
-- `postgres`
-- `api`
-- `tma`
-- `admin`
-- `display`
-- `nginx`
-
-## Database Migration Rules
-
-Use Prisma migrations for database schema changes.
-
-Rules:
-
-- Never change the database schema without a Prisma migration.
-- Never edit production database structure manually as the primary deployment method.
+## Database and Deployment
+- Use Prisma migrations for every schema change.
+- Do not manually edit production DB structure as the deployment path.
 - Keep seed data deterministic and documented.
-- Seed test lockers for MVP development and demo environments.
-- Update `docs/architecture.md`, `docs/deployment.md`, and `README.md` when schema, migration, or seed behavior changes.
-- Do not add payment transaction tables in MVP.
-- Keep `backend/api/prisma.config.ts`, `backend/api/prisma/schema.prisma`, migrations, seed scripts, and docs aligned.
+- VPS deployment must use Docker Compose and must not require host Node.js/npm/manual builds.
+- The `api` container runs migrations; Docker health check uses `GET /api/health/db`.
 
-## Environment Variable Rules
-
-Rules:
-
-- Never commit real `.env` files.
-- Keep `.env.example` updated with placeholders for all required variables.
-- Do not hardcode production secrets.
-- Do not assume production secrets.
-- Use `ADMIN_LOGIN`, `ADMIN_PASSWORD`, and `JWT_SECRET` for MVP admin authentication.
-- Use `TELEGRAM_BOT_TOKEN`, `TMA_JWT_SECRET`, `TMA_JWT_EXPIRES_IN`, `TMA_INIT_DATA_MAX_AGE_SECONDS`, `TMA_DEV_AUTH_ENABLED`, `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME` for Stage 10 TMA authentication.
-- Use `DATABASE_URL` for Prisma.
-- Document every new required variable in `README.md` and `docs/deployment.md`.
-
-## Admin Backend Rules
-
-Admin authentication is an MVP-only env-based login.
-
-Rules:
-
-- Do not create an `AdminUser` table unless the user explicitly approves that scope change.
-- Protect admin read/write endpoints with the JWT admin guard.
-- Read users, sessions, lockers, and dashboard stats from PostgreSQL through `PrismaService`.
-- Allow admin locker status changes only between `AVAILABLE` and `MAINTENANCE`.
-- Do not allow admin requests to manually set a locker to `OCCUPIED`.
-- Do not allow admin status changes on currently `OCCUPIED` lockers; occupied lockers are released by finishing active storage sessions.
-
-## Telegram MiniApp Frontend Rules
-
-The Telegram MiniApp lives in `apps/tma`.
-
-Rules:
-
-- Keep the TMA mobile-first and simple.
-- Use the backend API for all user, balance, active session, history, start-session, and finish-session data.
-- Do not add in-memory fake sessions or fake locker assignment logic in the frontend.
-- Use `VITE_TMA_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
-- Use `VITE_TMA_BASE_PATH` for the production Vite base path, defaulting to `/tma/` in Docker.
-- Authenticate through backend-validated Telegram `initData`.
-- Do not restore the production placeholder `telegramId` flow.
-- Local browser development without Telegram `initData` must rely on explicit backend `TMA_DEV_AUTH_ENABLED=true` with `TMA_DEV_TELEGRAM_ID`, `TMA_DEV_USERNAME`, `TMA_DEV_FIRST_NAME`, and `TMA_DEV_LAST_NAME`, not editable production identity fields.
-- Do not add payments, QR codes, WebSockets, or complex state management in the TMA MVP.
-
-## Admin Frontend Rules
-
-The admin frontend lives in `apps/admin`.
-
-Rules:
-
-- Keep the admin UI desktop-friendly, simple, and operational.
-- Use the Stage 4 admin API for login, dashboard, users, lockers, and sessions.
-- Store the JWT in `localStorage` only for MVP.
-- Use `VITE_ADMIN_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
-- Use `VITE_ADMIN_BASE_PATH` for the production Vite base path, defaulting to `/admin/` in Docker.
-- Do not implement advanced roles, permissions, or an `AdminUser` table.
-- Do not allow manually setting lockers to `OCCUPIED`.
-- Do not add payments, public display UI, Docker, Nginx, or complex state management as part of admin frontend work.
-
-## Public Display Frontend Rules
-
-The public display frontend lives in `apps/display`.
-
-Rules:
-
-- Keep the display read-only and unauthenticated.
-- Use the Stage 3 public API for lockers and stats.
-- Use `VITE_DISPLAY_API_BASE_URL` for the frontend API base URL, defaulting to `/api`.
-- Use `VITE_DISPLAY_BASE_PATH` for the production Vite base path, defaulting to `/display/` in Docker.
-- Use polling every few seconds for updates.
-- Show locker code, size, and status.
-- Clearly distinguish `AVAILABLE`, `OCCUPIED`, and `MAINTENANCE`.
-- Do not add admin controls, payments, QR codes, WebSockets, Docker, Nginx, or complex state management as part of public display frontend work.
-
-## Deployment Rules
-
-VPS assumptions:
-
-- Docker is installed.
-- Docker Compose is installed.
-- Git is installed.
-- Environment variables are provided through `.env`.
-
-Do not require:
-
-- Manual Node.js installation.
-- Manual npm install on the VPS host.
-- Manual frontend builds on the VPS host.
-- Manual database schema edits.
-
-Production routing must support:
-
-```txt
-https://example.com/tma      -> Telegram MiniApp frontend
-https://example.com/admin    -> Admin panel frontend
-https://example.com/display  -> Public display frontend
-https://example.com/api      -> Backend API
-```
-
-## Safe Change Rules
-
-Before editing:
-
-- Check repository status.
-- Inspect relevant files.
-- Avoid touching unrelated files.
-- Do not revert changes you did not make.
-- Keep changes small and aligned with existing architecture.
-
-After editing:
-
-- Run relevant checks when available.
-- Update documentation.
-- Summarize changed files.
-- Explain any commands that could not be run.
-
-## Library Documentation and Context7
-
-When encountering errors, unclear behavior, version-specific APIs, dependency issues, framework conventions, or uncertainty about any library used in this project, agents may use the Context7 MCP tools to inspect current official library documentation before changing code.
-
-Use Context7 especially for:
-
-- NestJS APIs, modules, decorators, guards, providers, and configuration.
-- Prisma schema, migrations, client usage, seeding, and transaction behavior.
-- React, Vite, and TypeScript patterns when frontend stages begin.
-- Nginx, Docker Compose, or deployment-related library/tool syntax when infrastructure stages begin.
-- Any dependency error where installed package behavior may differ from remembered behavior.
-
-Context7 usage rules:
-
-- Prefer current library documentation over memory when debugging errors.
-- Resolve the library ID first, then query the relevant docs.
-- Keep queries focused on the concrete error, API, or version-specific behavior.
-- Do not use documentation lookup as permission to expand MVP scope.
-- If docs reveal that existing project documentation is stale, update the relevant project docs in the same change.
-- Mention in the final report when Context7 materially informed a fix or design decision.
-
-## Reporting Format After Each Change
-
-When finishing a task, report:
-
-1. What changed.
-2. Which files were created or modified.
-3. Which documentation files were updated.
-4. Which checks were run.
-5. Any known gaps or next steps.
-
-For documentation-only changes, say explicitly that no backend/frontend logic was implemented.
-
-## If Unsure
-
-If unsure about architecture, scope, deployment, data model, or MVP boundaries, stop and propose a plan before editing.
-
-Prefer simple, maintainable solutions over clever abstractions.
+## Finish Report
+After a task, report what changed, files modified, docs updated, checks run, and any gaps. For documentation-only tasks, say no backend/frontend logic was implemented.
